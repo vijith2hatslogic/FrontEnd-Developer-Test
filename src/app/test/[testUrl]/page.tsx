@@ -164,13 +164,20 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
       })
       
       // Send email notification
-      await sendCompletionEmail({
-        candidateName: candidateInfo.name,
-        candidateEmail: candidateInfo.email,
-        testTitle: test.title,
-        testUrl: `${window.location.origin}/dashboard/tests/${test.id}`,
-        submissionTime: new Date().toLocaleString(),
-      })
+      try {
+        console.log('Sending email notification...');
+        const emailResult = await sendCompletionEmail({
+          candidateName: candidateInfo.name,
+          candidateEmail: candidateInfo.email,
+          testTitle: test.title,
+          testUrl: `${window.location.origin}/dashboard/tests/${test.id}`,
+          submissionTime: new Date().toLocaleString(),
+        });
+        console.log('Email notification result:', emailResult);
+      } catch (emailError) {
+        console.error('Failed to send email notification:', emailError);
+        // Continue with the submission process even if email fails
+      }
       
       // Move to completion step
       setStep(2)

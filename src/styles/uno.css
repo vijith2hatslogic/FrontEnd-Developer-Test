@@ -71,6 +71,7 @@
 .ms{margin-inline-start:1rem;}
 .mt-1{margin-top:0.25rem;}
 .mt-2{margin-top:0.5rem;}
+.mt-3{margin-top:0.75rem;}
 .mt-4{margin-top:1rem;}
 .mt-6{margin-top:1.5rem;}
 .mt-8{margin-top:2rem;}
@@ -83,12 +84,12 @@
 .h-3,
 [h3=""]{height:0.75rem;}
 .h-8{height:2rem;}
+.h-96{height:24rem;}
 .h-auto{height:auto;}
 .h-full,
 [h-full=""]{height:100%;}
 .max-h-64{max-height:16rem;}
 .max-w-2xl{max-width:42rem;}
-.max-w-3xl{max-width:48rem;}
 .max-w-4xl{max-width:56rem;}
 .max-w-full{max-width:100%;}
 .max-w-md{max-width:28rem;}
@@ -101,7 +102,9 @@
 .w-8{width:2rem;}
 .w-full,
 [w-full=""]{width:100%;}
+[h1=""]{height:0.25rem;}
 [h2=""]{height:0.5rem;}
+[h4=""]{height:1rem;}
 [h5=""]{height:1.25rem;}
 .flex{display:flex;}
 .flex-1{flex:1 1 0%;}
@@ -139,6 +142,7 @@
 .border,
 [b=""],
 [border=""]{border-width:1px;}
+.border-0{border-width:0px;}
 .border-b{border-bottom-width:1px;}
 .border-b-2,
 [border-b-2=""]{border-bottom-width:2px;}
@@ -197,6 +201,7 @@
 .py-3{padding-top:0.75rem;padding-bottom:0.75rem;}
 .py-8{padding-top:2rem;padding-bottom:2rem;}
 .pl-5{padding-left:1.25rem;}
+.pt-3{padding-top:0.75rem;}
 .pt-4{padding-top:1rem;}
 .pt-6{padding-top:1.5rem;}
 .pie,
