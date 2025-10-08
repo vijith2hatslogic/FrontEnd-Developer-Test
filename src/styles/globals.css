@@ -1,0 +1,18 @@
+/* Import UnoCSS base styles */
+@import '@unocss/reset/tailwind.css';
+
+/* Import generated UnoCSS styles */
+@import './uno.css';
+
+/* Global styles */
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-rgb: 249, 250, 251;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-rgb));
+}
+
+/* Add any additional global styles here */
