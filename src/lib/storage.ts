@@ -454,6 +454,33 @@ export const storageService = {
     }
   },
   
+  duplicateTest: async (testId: string, userId: string): Promise<Test> => {
+    try {
+      // Get the original test
+      const originalTest = await storageService.getTestById(testId);
+      
+      if (!originalTest) {
+        throw new Error('Test not found');
+      }
+      
+      // Create a new test with the same data but a new ID and URL
+      const duplicatedTest = await storageService.createTest({
+        title: `${originalTest.title} (Copy)`,
+        description: originalTest.description,
+        experienceLevel: originalTest.experienceLevel,
+        techStacks: originalTest.techStacks,
+        totalTime: originalTest.totalTime,
+        tasks: originalTest.tasks,
+        createdBy: userId
+      });
+      
+      return duplicatedTest;
+    } catch (error) {
+      console.error('Error duplicating test:', error);
+      throw error;
+    }
+  },
+  
   addSubmission: async (testId: string, submission: Omit<TestSubmission, 'id' | 'submittedAt'>): Promise<TestSubmission> => {
     try {
       const submissionId = uuidv4();

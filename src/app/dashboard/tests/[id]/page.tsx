@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { use } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/auth/AuthProvider'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import { storageService, Test } from '@/lib/storage'
@@ -16,6 +17,7 @@ export default function TestView({ params }: PageProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { user } = useAuth()
+  const router = useRouter()
   const testId = use(params).id
   
   useEffect(() => {
@@ -245,6 +247,25 @@ export default function TestView({ params }: PageProps) {
               >
                 Edit Test
               </Link>
+              <button
+                onClick={async () => {
+                  if (!user) return;
+                  
+                  try {
+                    const confirmed = window.confirm('Do you want to duplicate this test?');
+                    if (!confirmed) return;
+                    
+                    const duplicatedTest = await storageService.duplicateTest(test.id, user.id);
+                    router.push(`/dashboard/tests/${duplicatedTest.id}`);
+                  } catch (error) {
+                    console.error('Error duplicating test:', error);
+                    alert('Failed to duplicate test. Please try again.');
+                  }
+                }}
+                className="btn btn-primary flex-1"
+              >
+                Duplicate Test
+              </button>
             </div>
           </div>
         </div>
