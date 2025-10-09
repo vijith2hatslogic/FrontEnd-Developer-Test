@@ -34,9 +34,7 @@ export default function ThoughtProcessTask({
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false)
   const [responseProgress, setResponseProgress] = useState(0)
   
-  useEffect(() => {
-    onChange(value)
-  }, [value, onChange])
+  // We'll call onChange directly in the handleChange function instead
   
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null
@@ -60,7 +58,9 @@ export default function ThoughtProcessTask({
   }, [isGeneratingResponse])
   
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setValue(e.target.value)
+    const newValue = e.target.value
+    setValue(newValue)
+    onChange(newValue)
   }
   
   const aiPrompts: AiPrompt[] = [
@@ -100,7 +100,9 @@ export default function ThoughtProcessTask({
     setTimeout(() => {
       // In a real implementation, this would call an AI service
       const aiResponse = generateMockAiResponse(selectedPrompt.prompt, taskTitle, taskDescription)
-      setValue(prev => prev ? `${prev}\n\n## ${selectedPrompt.title}\n${aiResponse}` : `## ${selectedPrompt.title}\n${aiResponse}`)
+      const newValue = value ? `${value}\n\n## ${selectedPrompt.title}\n${aiResponse}` : `## ${selectedPrompt.title}\n${aiResponse}`
+      setValue(newValue)
+      onChange(newValue)
       setIsGeneratingResponse(false)
       setResponseProgress(100)
       setSelectedPrompt(null)

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { nanoid } from 'nanoid'
@@ -32,6 +33,7 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const router = useRouter()
+  const testUrl = use(params).testUrl
   
   const { register, handleSubmit, formState: { errors } } = useForm<CandidateFormData>({
     resolver: zodResolver(candidateSchema),
@@ -40,8 +42,6 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
   useEffect(() => {
     const fetchTest = async () => {
       try {
-        // Get the testUrl from params safely
-        const testUrl = params?.testUrl || '';
         if (!testUrl) {
           setError('Invalid test URL')
           setLoading(false)
@@ -87,7 +87,7 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
     }
     
     fetchTest()
-  }, [params.testUrl]) // Add params.testUrl dependency since we're using React.use now
+  }, [testUrl])
   
   // Timer effect
   useEffect(() => {

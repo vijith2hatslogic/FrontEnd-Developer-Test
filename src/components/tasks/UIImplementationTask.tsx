@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Tab } from '@headlessui/react'
+import CodeEditor from './CodeEditor'
 
 interface UIImplementationTaskProps {
   designImageUrl?: string
@@ -35,25 +36,23 @@ export default function UIImplementationTask({
   const [previewMode, setPreviewMode] = useState<'light' | 'dark'>('light')
   const [showDesignOverlay, setShowDesignOverlay] = useState(false)
   
-  useEffect(() => {
-    // Update parent component when html or css changes
-    onHtmlChange(html)
-    onCssChange(css)
+  // We don't need this useEffect as we're already calling the onChange handlers in the handleChange functions
+  
+  const handleHtmlChange = (code: string) => {
+    setHtml(code)
+    onHtmlChange(code)
+  }
+  
+  const handleCssChange = (code: string) => {
+    setCss(code)
+    onCssChange(code)
+  }
+  
+  const handleJsChange = (code: string) => {
+    setJs(code)
     if (showJsEditor && onJsChange) {
-      onJsChange(js)
+      onJsChange(code)
     }
-  }, [html, css, js, onHtmlChange, onCssChange, onJsChange, showJsEditor])
-  
-  const handleHtmlChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setHtml(e.target.value)
-  }
-  
-  const handleCssChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setCss(e.target.value)
-  }
-  
-  const handleJsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setJs(e.target.value)
   }
   
   const refreshPreview = () => {
@@ -160,32 +159,32 @@ export default function UIImplementationTask({
             </Tab.List>
             <Tab.Panels className="border border-t-0 rounded-b-lg">
               <Tab.Panel className="p-4">
-                <textarea
-                  className="input w-full font-mono text-sm"
-                  rows={12}
-                  value={html}
+                <CodeEditor
+                  initialCode={html}
+                  language="html"
                   onChange={handleHtmlChange}
-                  placeholder="<!-- Write your HTML here -->"
-                ></textarea>
+                  showPreview={false}
+                  theme={previewMode === 'dark' ? 'dark' : 'light'}
+                />
               </Tab.Panel>
               <Tab.Panel className="p-4">
-                <textarea
-                  className="input w-full font-mono text-sm"
-                  rows={12}
-                  value={css}
+                <CodeEditor
+                  initialCode={css}
+                  language="css"
                   onChange={handleCssChange}
-                  placeholder="/* Write your CSS here */"
-                ></textarea>
+                  showPreview={false}
+                  theme={previewMode === 'dark' ? 'dark' : 'light'}
+                />
               </Tab.Panel>
               {showJsEditor && (
                 <Tab.Panel className="p-4">
-                  <textarea
-                    className="input w-full font-mono text-sm"
-                    rows={12}
-                    value={js}
+                  <CodeEditor
+                    initialCode={js}
+                    language="javascript"
                     onChange={handleJsChange}
-                    placeholder="// Write your JavaScript here"
-                  ></textarea>
+                    showPreview={false}
+                    theme={previewMode === 'dark' ? 'dark' : 'light'}
+                  />
                 </Tab.Panel>
               )}
             </Tab.Panels>

@@ -2,23 +2,36 @@
 
 import { useState } from 'react'
 import { TestCase } from '@/lib/storage'
+import CodeEditor from './CodeEditor'
 
 interface CodeExecutionEnvironmentProps {
   code: string
   testCases?: TestCase[]
   onResultsChange?: (results: { passed: boolean; message?: string; executionTime?: number }[]) => void
   language?: 'javascript' | 'typescript' | 'html' | 'css'
+  onCodeChange?: (code: string) => void
 }
 
 export default function CodeExecutionEnvironment({
   code,
   testCases = [],
   onResultsChange,
+  language = 'javascript',
+  onCodeChange,
 }: CodeExecutionEnvironmentProps) {
+  const [currentCode, setCurrentCode] = useState(code)
   const [isRunning, setIsRunning] = useState(false)
   const [results, setResults] = useState<{ passed: boolean; message?: string; executionTime?: number }[]>([])
   const [consoleOutput, setConsoleOutput] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState<'tests' | 'console'>('tests')
+  
+  // Handle code changes
+  const handleCodeChange = (newCode: string) => {
+    setCurrentCode(newCode)
+    if (onCodeChange) {
+      onCodeChange(newCode)
+    }
+  }
   
   // Execute the code in a sandboxed environment
   const executeCode = () => {
@@ -56,7 +69,7 @@ export default function CodeExecutionEnvironment({
         try {
           // Create a function from the code
           const userFunction = new Function('input', 'console', `
-            ${code}
+            ${currentCode}
             return processInput(input);
           `)
           
@@ -107,11 +120,16 @@ export default function CodeExecutionEnvironment({
         </button>
       </div>
       
-      {testCases.length === 0 ? (
-        <div className="text-gray-500 text-sm p-4 border rounded">
-          No test cases available for this task.
-        </div>
-      ) : (
+      <CodeEditor
+        initialCode={currentCode}
+        language={language}
+        onChange={handleCodeChange}
+        showPreview={true}
+        previewType="both"
+        testCases={testCases}
+      />
+      
+      {testCases.length > 0 && (
         <div>
           <div className="flex border-b">
             <button
