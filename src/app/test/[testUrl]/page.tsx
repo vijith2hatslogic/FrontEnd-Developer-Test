@@ -12,13 +12,20 @@ import { sendCompletionEmail } from '@/lib/email/sendNotification'
 import UIImplementationTask from '@/components/tasks/UIImplementationTask'
 import ThoughtProcessTask from '@/components/tasks/ThoughtProcessTask'
 import CodeExecutionEnvironment from '@/components/tasks/CodeExecutionEnvironment'
+import dynamic from 'next/dynamic'
+
+// Import the recording manager with no SSR
+const BasicRecordingManager = dynamic(
+  () => import('@/components/tasks/BasicRecordingManager'),
+  { ssr: false }
+)
 import { storageService, Test, TaskSubmission } from '@/lib/storage'
 
 const candidateSchema = z.object({
   name: z.string().min(2, 'Name is required'),
   email: z.string().email('Valid email is required'),
   phone: z.string().optional(),
-  yearsOfExperience: z.string().min(1, 'Please select your experience level'),
+  yearsOfExperience: z.string().optional(),
 })
 
 type CandidateFormData = z.infer<typeof candidateSchema>
@@ -32,6 +39,9 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
   const [taskSubmissions, setTaskSubmissions] = useState<TaskSubmission[]>([])
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0)
   const [submitting, setSubmitting] = useState(false)
+  const [webcamRecordingData, setWebcamRecordingData] = useState<string>('')
+  const [screenRecordingData, setScreenRecordingData] = useState<string>('')
+  const [recordingStarted, setRecordingStarted] = useState(false)
   const router = useRouter()
   const testUrl = use(params).testUrl
   
@@ -148,34 +158,64 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
       const candidateInfoStr = localStorage.getItem('candidateInfo')
       if (!candidateInfoStr) {
         setError('Candidate information not found')
+        setSubmitting(false)
         return
       }
       
-      const candidateInfo = JSON.parse(candidateInfoStr) as CandidateFormData
+      let candidateInfo: CandidateFormData
+      try {
+        candidateInfo = JSON.parse(candidateInfoStr) as CandidateFormData
+      } catch (parseError) {
+        console.error('Error parsing candidate info:', parseError)
+        setError('Invalid candidate information format')
+        setSubmitting(false)
+        return
+      }
       
-      // Add submission to test
-      await storageService.addSubmission(test.id, {
+      // Get recording data from our recording service
+      let webcamRecording = webcamRecordingData
+      let screenRecording = screenRecordingData
+      
+      console.log('Preparing submission with recordings:', {
+        webcamRecordingAvailable: Boolean(webcamRecording),
+        screenRecordingAvailable: Boolean(screenRecording),
+        webcamRecordingSize: webcamRecording ? webcamRecording.length : 0,
+        screenRecordingSize: screenRecording ? screenRecording.length : 0
+      })
+      
+      // Prepare submission data including recordings
+      const submissionData = {
         candidateName: candidateInfo.name,
         candidateEmail: candidateInfo.email,
         candidatePhone: candidateInfo.phone || '',
-        yearsOfExperience: candidateInfo.yearsOfExperience,
+        yearsOfExperience: candidateInfo.yearsOfExperience || 'Not specified',
         taskSubmissions,
         timeSpent: test.totalTime * 60 - timeRemaining, // in seconds
-      })
+        webcamRecording,
+        screenRecording
+      }
+      
+      // Add submission to test
+      try {
+        await storageService.addSubmission(test.id, submissionData)
+      } catch (submissionError) {
+        console.error('Error in storageService.addSubmission:', submissionError)
+        throw submissionError
+      }
       
       // Send email notification
       try {
-        console.log('Sending email notification...');
+        console.log('Sending email notification...')
         const emailResult = await sendCompletionEmail({
           candidateName: candidateInfo.name,
           candidateEmail: candidateInfo.email,
           testTitle: test.title,
           testUrl: `${window.location.origin}/dashboard/tests/${test.id}`,
           submissionTime: new Date().toLocaleString(),
-        });
-        console.log('Email notification result:', emailResult);
+        })
+        console.log('Email notification result:', emailResult)
       } catch (emailError) {
-        console.error('Failed to send email notification:', emailError);
+        console.error('Failed to send email notification:', emailError)
         // Continue with the submission process even if email fails
       }
       
@@ -183,7 +223,11 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
       setStep(2)
     } catch (err) {
       console.error('Error submitting test:', err)
-      setError('Failed to submit test. Please try again.')
+      if (err instanceof Error) {
+        setError(`Failed to submit test: ${err.message}. Please try again.`)
+      } else {
+        setError('Failed to submit test. Please try again.')
+      }
     } finally {
       setSubmitting(false)
     }
@@ -304,34 +348,23 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
                 />
               </div>
               
-              <div>
-                <label htmlFor="yearsOfExperience" className="block text-sm font-medium mb-1">
-                  Years of Experience
-                </label>
-                <select
-                  id="yearsOfExperience"
-                  className="input w-full"
-                  {...register('yearsOfExperience')}
-                >
-                  <option value="">Select your experience level</option>
-                  <option value="0-1 years">0-1 years</option>
-                  <option value="1-2 years">1-2 years</option>
-                  <option value="2-3 years">2-3 years</option>
-                  <option value="3-5 years">3-5 years</option>
-                  <option value="5-8 years">5-8 years</option>
-                  <option value="8+ years">8+ years</option>
-                </select>
-                {errors.yearsOfExperience && (
-                  <p className="text-danger text-sm mt-1">{errors.yearsOfExperience.message}</p>
-                )}
-              </div>
               
               <div className="pt-4">
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
+                  <h3 className="font-medium text-yellow-800 mb-2">Important Notice</h3>
+                  <p className="text-sm text-yellow-700">
+                    This test requires webcam and screen recording for monitoring purposes. 
+                    Your webcam feed and screen will be recorded during the test session.
+                    The recordings will be available only to the test administrator.
+                  </p>
+                </div>
+                
                 <button type="submit" className="btn btn-primary w-full">
                   Start Test
                 </button>
                 <p className="text-sm text-gray-500 mt-2">
-                  By starting the test, you agree to complete it within the allocated time.
+                  By starting the test, you agree to complete it within the allocated time,
+                  and consent to webcam and screen recording during the test session.
                   The timer will start immediately.
                 </p>
               </div>
@@ -357,246 +390,281 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
           </div>
         </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-1">
-            <div className="card sticky top-4">
-              <h2 className="text-lg font-semibold mb-4">Tasks</h2>
-              <div className="space-y-2">
-                {test.tasks.map((task, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setCurrentTaskIndex(index)}
-                    className={`w-full text-left p-3 rounded-lg ${
-                      currentTaskIndex === index
-                        ? 'bg-primary text-white'
-                        : 'hover:bg-light'
-                    }`}
-                  >
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium truncate">{task.title}</span>
-                      <span className="text-xs">
-                        {task.timeAllotted} min
-                      </span>
-                    </div>
-                    <div className="text-xs mt-1 capitalize">
-                      {task.type.replace('-', ' ')}
-                    </div>
-                  </button>
-                ))}
-              </div>
-              
-              <button
-                onClick={handleSubmitTest}
-                className="btn btn-primary w-full mt-6"
-                disabled={submitting}
-              >
-                {submitting ? 'Submitting...' : 'Submit Test'}
-              </button>
-            </div>
-          </div>
-          
-          <div className="lg:col-span-3">
-            <div className="card mb-6">
-              <div className="flex justify-between items-start mb-4">
-                <h2 className="text-xl font-semibold">{currentTask.title}</h2>
-                <span className="bg-light px-3 py-1 text-sm rounded">
-                  {currentTask.timeAllotted} minutes
-                </span>
-              </div>
-              
-              <p className="mb-6">{currentTask.description}</p>
-              
-              {currentTask.type === 'coding' && currentTask.codeSnippet && (
-                <div className="mb-6">
-                  <h3 className="font-medium mb-2">Starting Code:</h3>
-                  <pre className="bg-dark text-white p-4 rounded overflow-x-auto text-sm">
-                    {currentTask.codeSnippet}
-                  </pre>
+        <div className="card mb-6">
+          <BasicRecordingManager 
+            onWebcamRecordingComplete={(data) => {
+              setWebcamRecordingData(data)
+              setRecordingStarted(true)
+            }}
+            onScreenRecordingComplete={setScreenRecordingData}
+          />
+        </div>
+        
+        {recordingStarted ? (
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="lg:col-span-1">
+              <div className="card sticky top-4">
+                <h2 className="text-lg font-semibold mb-4">Tasks</h2>
+                <div className="space-y-2">
+                  {test.tasks.map((task, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentTaskIndex(index)}
+                      className={`w-full text-left p-3 rounded-lg ${
+                        currentTaskIndex === index
+                          ? 'bg-primary text-white'
+                          : 'hover:bg-light'
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium truncate">{task.title}</span>
+                        <span className="text-xs">
+                          {task.timeAllotted} min
+                        </span>
+                      </div>
+                      <div className="text-xs mt-1 capitalize">
+                        {task.type.replace('-', ' ')}
+                      </div>
+                    </button>
+                  ))}
                 </div>
-              )}
-              
-              {currentTask.type === 'ui-implementation' && currentTask.designImageUrl && (
-                <div className="mb-6">
-                  <h3 className="font-medium mb-2">Design Reference:</h3>
-                  <img 
-                    src={currentTask.designImageUrl} 
-                    alt="Design Reference" 
-                    className="max-w-full h-auto rounded border"
-                  />
-                </div>
-              )}
-            </div>
-            
-            <div className="card">
-              <h3 className="font-medium mb-4">Your Solution</h3>
-              
-              {currentTask.type === 'coding' && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Code Submission
-                    </label>
-                    <textarea
-                      rows={10}
-                      className="input w-full font-mono text-sm"
-                      placeholder="Write your code here..."
-                      value={taskSubmissions[currentTaskIndex]?.codeSubmission || ''}
-                      onChange={(e) => 
-                        updateTaskSubmission(
-                          currentTaskIndex,
-                          'codeSubmission',
-                          e.target.value
-                        )
-                      }
-                    ></textarea>
-                  </div>
-                  
-                  {currentTask.testCases && currentTask.testCases.length > 0 && (
-                    <CodeExecutionEnvironment 
-                      code={taskSubmissions[currentTaskIndex]?.codeSubmission || ''}
-                      testCases={currentTask.testCases}
-                      onResultsChange={(results) => {
-                        const updatedSubmission = { ...taskSubmissions[currentTaskIndex] };
-                        updatedSubmission.testResults = results;
-                        setTaskSubmissions(prev => 
-                          prev.map((submission, idx) => 
-                            idx === currentTaskIndex ? updatedSubmission : submission
-                          )
-                        );
-                      }}
-                    />
-                  )}
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Explanation (optional)
-                    </label>
-                    <textarea
-                      rows={4}
-                      className="input w-full"
-                      placeholder="Explain your approach and solution..."
-                      value={taskSubmissions[currentTaskIndex]?.answer || ''}
-                      onChange={(e) => 
-                        updateTaskSubmission(
-                          currentTaskIndex,
-                          'answer',
-                          e.target.value
-                        )
-                      }
-                    ></textarea>
-                  </div>
-                </div>
-              )}
-              
-              {currentTask.type === 'ui-implementation' && (
-                <UIImplementationTask
-                  designImageUrl={currentTask.designImageUrl}
-                  initialHtml={taskSubmissions[currentTaskIndex]?.htmlImplementation || ''}
-                  initialCss={taskSubmissions[currentTaskIndex]?.cssImplementation || ''}
-                  initialJs={taskSubmissions[currentTaskIndex]?.jsImplementation || ''}
-                  showJsEditor={currentTask.requiresJavaScript}
-                  responsivePreview={true}
-                  onHtmlChange={(value) => 
-                    updateTaskSubmission(
-                      currentTaskIndex,
-                      'htmlImplementation',
-                      value
-                    )
-                  }
-                  onCssChange={(value) => 
-                    updateTaskSubmission(
-                      currentTaskIndex,
-                      'cssImplementation',
-                      value
-                    )
-                  }
-                  onJsChange={(value) => 
-                    updateTaskSubmission(
-                      currentTaskIndex,
-                      'jsImplementation',
-                      value
-                    )
-                  }
-                />
-              )}
-              
-              {(currentTask.type === 'debugging' || currentTask.type === 'optimization') && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Solution
-                    </label>
-                    <textarea
-                      rows={10}
-                      className="input w-full font-mono text-sm"
-                      placeholder="Write your solution here..."
-                      value={taskSubmissions[currentTaskIndex]?.codeSubmission || ''}
-                      onChange={(e) => 
-                        updateTaskSubmission(
-                          currentTaskIndex,
-                          'codeSubmission',
-                          e.target.value
-                        )
-                      }
-                    ></textarea>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Explanation
-                    </label>
-                    <textarea
-                      rows={4}
-                      className="input w-full"
-                      placeholder="Explain what issues you found and how you fixed them..."
-                      value={taskSubmissions[currentTaskIndex]?.answer || ''}
-                      onChange={(e) => 
-                        updateTaskSubmission(
-                          currentTaskIndex,
-                          'answer',
-                          e.target.value
-                        )
-                      }
-                    ></textarea>
-                  </div>
-                </div>
-              )}
-              
-              {currentTask.type === 'thought-process' && (
-                <ThoughtProcessTask
-                  initialValue={taskSubmissions[currentTaskIndex]?.thoughtProcess || ''}
-                  taskTitle={currentTask.title}
-                  taskDescription={currentTask.description}
-                  onChange={(value) => 
-                    updateTaskSubmission(
-                      currentTaskIndex,
-                      'thoughtProcess',
-                      value
-                    )
-                  }
-                />
-              )}
-              
-              <div className="flex justify-between mt-6">
-                <button
-                  onClick={() => setCurrentTaskIndex(Math.max(0, currentTaskIndex - 1))}
-                  disabled={currentTaskIndex === 0}
-                  className="btn btn-secondary"
-                >
-                  Previous Task
-                </button>
                 
                 <button
-                  onClick={() => setCurrentTaskIndex(Math.min(test.tasks.length - 1, currentTaskIndex + 1))}
-                  disabled={currentTaskIndex === test.tasks.length - 1}
-                  className="btn btn-primary"
+                  onClick={handleSubmitTest}
+                  className="btn btn-primary w-full mt-6"
+                  disabled={submitting}
                 >
-                  Next Task
+                  {submitting ? 'Submitting...' : 'Submit Test'}
                 </button>
               </div>
             </div>
+            
+            <div className="lg:col-span-3">
+              <div className="card mb-6">
+                <div className="flex justify-between items-start mb-4">
+                  <h2 className="text-xl font-semibold">{currentTask.title}</h2>
+                  <span className="bg-light px-3 py-1 text-sm rounded">
+                    {currentTask.timeAllotted} minutes
+                  </span>
+                </div>
+                
+                <p className="mb-6">{currentTask.description}</p>
+                
+                {currentTask.type === 'coding' && currentTask.codeSnippet && (
+                  <div className="mb-6">
+                    <h3 className="font-medium mb-2">Starting Code:</h3>
+                    <pre className="bg-dark text-white p-4 rounded overflow-x-auto text-sm">
+                      {currentTask.codeSnippet}
+                    </pre>
+                  </div>
+                )}
+                
+                {currentTask.type === 'ui-implementation' && currentTask.designImageUrl && (
+                  <div className="mb-6">
+                    <h3 className="font-medium mb-2">Design Reference:</h3>
+                    <img 
+                      src={currentTask.designImageUrl} 
+                      alt="Design Reference" 
+                      className="max-w-full h-auto rounded border"
+                    />
+                  </div>
+                )}
+              </div>
+              
+              <div className="card">
+                <h3 className="font-medium mb-4">Your Solution</h3>
+                
+                {currentTask.type === 'coding' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Code Submission
+                      </label>
+                      <textarea
+                        rows={10}
+                        className="input w-full font-mono text-sm"
+                        placeholder="Write your code here..."
+                        value={taskSubmissions[currentTaskIndex]?.codeSubmission || ''}
+                        onChange={(e) => 
+                          updateTaskSubmission(
+                            currentTaskIndex,
+                            'codeSubmission',
+                            e.target.value
+                          )
+                        }
+                      ></textarea>
+                    </div>
+                    
+                    {currentTask.testCases && currentTask.testCases.length > 0 && (
+                      <CodeExecutionEnvironment 
+                        code={taskSubmissions[currentTaskIndex]?.codeSubmission || ''}
+                        testCases={currentTask.testCases}
+                        onResultsChange={(results) => {
+                          const updatedSubmission = { ...taskSubmissions[currentTaskIndex] };
+                          updatedSubmission.testResults = results;
+                          setTaskSubmissions(prev => 
+                            prev.map((submission, idx) => 
+                              idx === currentTaskIndex ? updatedSubmission : submission
+                            )
+                          );
+                        }}
+                      />
+                    )}
+                    
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Explanation (optional)
+                      </label>
+                      <textarea
+                        rows={4}
+                        className="input w-full"
+                        placeholder="Explain your approach and solution..."
+                        value={taskSubmissions[currentTaskIndex]?.answer || ''}
+                        onChange={(e) => 
+                          updateTaskSubmission(
+                            currentTaskIndex,
+                            'answer',
+                            e.target.value
+                          )
+                        }
+                      ></textarea>
+                    </div>
+                  </div>
+                )}
+                
+                {currentTask.type === 'ui-implementation' && (
+                  <UIImplementationTask
+                    designImageUrl={currentTask.designImageUrl}
+                    initialHtml={taskSubmissions[currentTaskIndex]?.htmlImplementation || ''}
+                    initialCss={taskSubmissions[currentTaskIndex]?.cssImplementation || ''}
+                    initialJs={taskSubmissions[currentTaskIndex]?.jsImplementation || ''}
+                    showJsEditor={currentTask.requiresJavaScript}
+                    responsivePreview={true}
+                    onHtmlChange={(value) => 
+                      updateTaskSubmission(
+                        currentTaskIndex,
+                        'htmlImplementation',
+                        value
+                      )
+                    }
+                    onCssChange={(value) => 
+                      updateTaskSubmission(
+                        currentTaskIndex,
+                        'cssImplementation',
+                        value
+                      )
+                    }
+                    onJsChange={(value) => 
+                      updateTaskSubmission(
+                        currentTaskIndex,
+                        'jsImplementation',
+                        value
+                      )
+                    }
+                  />
+                )}
+                
+                {(currentTask.type === 'debugging' || currentTask.type === 'optimization') && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Solution
+                      </label>
+                      <textarea
+                        rows={10}
+                        className="input w-full font-mono text-sm"
+                        placeholder="Write your solution here..."
+                        value={taskSubmissions[currentTaskIndex]?.codeSubmission || ''}
+                        onChange={(e) => 
+                          updateTaskSubmission(
+                            currentTaskIndex,
+                            'codeSubmission',
+                            e.target.value
+                          )
+                        }
+                      ></textarea>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Explanation
+                      </label>
+                      <textarea
+                        rows={4}
+                        className="input w-full"
+                        placeholder="Explain what issues you found and how you fixed them..."
+                        value={taskSubmissions[currentTaskIndex]?.answer || ''}
+                        onChange={(e) => 
+                          updateTaskSubmission(
+                            currentTaskIndex,
+                            'answer',
+                            e.target.value
+                          )
+                        }
+                      ></textarea>
+                    </div>
+                  </div>
+                )}
+                
+                {currentTask.type === 'thought-process' && (
+                  <ThoughtProcessTask
+                    initialValue={taskSubmissions[currentTaskIndex]?.thoughtProcess || ''}
+                    taskTitle={currentTask.title}
+                    taskDescription={currentTask.description}
+                    onChange={(value) => 
+                      updateTaskSubmission(
+                        currentTaskIndex,
+                        'thoughtProcess',
+                        value
+                      )
+                    }
+                  />
+                )}
+                
+                <div className="flex justify-between mt-6">
+                  <button
+                    onClick={() => setCurrentTaskIndex(Math.max(0, currentTaskIndex - 1))}
+                    disabled={currentTaskIndex === 0}
+                    className="btn btn-secondary"
+                  >
+                    Previous Task
+                  </button>
+                  
+                  {currentTaskIndex === test.tasks.length - 1 ? (
+                    <button
+                      onClick={handleSubmitTest}
+                      className="btn btn-success"
+                      disabled={submitting}
+                    >
+                      {submitting ? 'Submitting...' : 'Submit Test'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setCurrentTaskIndex(currentTaskIndex + 1)}
+                      className="btn btn-primary"
+                    >
+                      Next Task
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="card p-6 text-center">
+            <div className="text-xl font-medium mb-4">Enable Webcam and Screen Sharing to Continue</div>
+            <p className="mb-6 text-gray-600">
+              You must enable both webcam and screen sharing, and click "Start Recording" to access the test content.
+              This is required for test monitoring purposes.
+            </p>
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-blue-700">
+                <strong>Instructions:</strong> Click the "Enable Webcam" and "Share Screen" buttons above, 
+                then click "Start Recording" to begin the test.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     )
   }

@@ -40,7 +40,9 @@ CREATE TABLE IF NOT EXISTS test_submissions (
   years_of_experience TEXT NOT NULL,
   task_submissions JSONB NOT NULL,
   submitted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  time_spent INTEGER NOT NULL
+  time_spent INTEGER NOT NULL,
+  webcam_recording TEXT,
+  screen_recording TEXT
 );
 
 -- Create indexes for performance

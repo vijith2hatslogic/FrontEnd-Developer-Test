@@ -5,13 +5,38 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/components/auth/AuthProvider'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
-import { storageService, Test } from '@/lib/storage'
+import { storageService, Test, TestSubmission } from '@/lib/storage'
 
 export default function Dashboard() {
   const [tests, setTests] = useState<Test[]>([])
   const [loading, setLoading] = useState(true)
+  const [viewedSubmissions, setViewedSubmissions] = useState<Record<string, Set<string>>>({})
   const { user, logout } = useAuth()
   const router = useRouter()
+  
+  // Load viewed submissions from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const newViewedSubmissions: Record<string, Set<string>> = {};
+      
+      tests.forEach(test => {
+        const storedViewedSubmissions = localStorage.getItem(`viewed_submissions_${test.id}`);
+        if (storedViewedSubmissions) {
+          try {
+            const parsed = JSON.parse(storedViewedSubmissions);
+            newViewedSubmissions[test.id] = new Set(parsed);
+          } catch (e) {
+            console.error('Error parsing viewed submissions:', e);
+            newViewedSubmissions[test.id] = new Set();
+          }
+        } else {
+          newViewedSubmissions[test.id] = new Set();
+        }
+      });
+      
+      setViewedSubmissions(newViewedSubmissions);
+    }
+  }, [tests])
 
   useEffect(() => {
     const fetchTests = async () => {
@@ -101,9 +126,16 @@ export default function Dashboard() {
                         <div className="flex gap-2">
                           <Link 
                             href={`/dashboard/tests/${test.id}`}
-                            className="text-primary hover:underline text-sm"
+                            className="text-primary hover:underline text-sm flex items-center"
                           >
                             View
+                            {test.submissions && test.submissions.some(submission => 
+                              !viewedSubmissions[test.id]?.has(submission.id)
+                            ) && (
+                              <span className="ml-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                                New
+                              </span>
+                            )}
                           </Link>
                           <Link 
                             href={`/dashboard/tests/${test.id}/edit`}

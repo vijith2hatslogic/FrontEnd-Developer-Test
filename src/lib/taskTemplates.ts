@@ -26,6 +26,53 @@ export const taskTemplates: TaskTemplate = {
 <!-- Navigation controls and progress indicator -->`,
       expectedOutput: 'A multi-step form with validation, progress tracking, and smooth navigation between steps.',
     },
+    {
+      type: 'debugging',
+      title: 'Fix HTML Accessibility Issues',
+      description: 'The provided HTML has several accessibility issues including missing alt attributes, improper heading hierarchy, non-semantic markup, and keyboard navigation problems. Identify and fix all accessibility issues to ensure the page is WCAG compliant.',
+      timeAllotted: 25,
+      codeSnippet: `<div class="header">
+  <img src="logo.png" />
+  <div class="nav">
+    <div onclick="navigate('home')">Home</div>
+    <div onclick="navigate('products')">Products</div>
+    <div onclick="navigate('about')">About</div>
+    <div onclick="navigate('contact')">Contact</div>
+  </div>
+</div>
+
+<div class="hero">
+  <div class="hero-title">Welcome to Our Website</div>
+  <img src="hero-image.jpg" />
+  <div class="cta" onclick="signUp()">Sign Up Now</div>
+</div>
+
+<div class="content">
+  <div class="section">
+    <div class="section-title">Our Services</div>
+    <div class="cards">
+      <div class="card">
+        <img src="service1.jpg" />
+        <div>Web Design</div>
+        <div>We create beautiful websites</div>
+      </div>
+      <div class="card">
+        <img src="service2.jpg" />
+        <div>App Development</div>
+        <div>Mobile apps for your business</div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="form">
+    <div>Contact Us</div>
+    <input type="text" placeholder="Name" />
+    <input type="text" placeholder="Email" />
+    <input type="text" placeholder="Message" />
+    <div class="submit-btn" onclick="submitForm()">Submit</div>
+  </div>
+</div>`,
+    },
   ],
   'CSS': [
     {
@@ -101,6 +148,45 @@ export const taskTemplates: TaskTemplate = {
       description: 'Create a theme switcher that toggles between light and dark mode with smooth transitions. The toggle should be fully accessible, work with keyboard navigation, and respect user system preferences. Implement proper ARIA attributes and focus states. The toggle should persist user preference using localStorage.',
       timeAllotted: 30,
       designImageUrl: '/task-images/theme-toggle.png',
+    },
+    {
+      type: 'ui-implementation',
+      title: 'Build Micro-Component Library',
+      description: 'Create a set of small, reusable UI components including: 1) A product card with image, title, price, rating, and CTA button, 2) A notification toast component with success, error, and info variants, 3) A custom dropdown select with search functionality, and 4) A content loader/skeleton component. Ensure all components are responsive, accessible, and have proper hover/focus states.',
+      timeAllotted: 40,
+      codeSnippet: `/* Implement your component styles using CSS */
+/* You may use a CSS methodology of your choice (BEM, SMACSS, etc.) */
+
+/* Base styles */
+:root {
+  --primary: #3b82f6;
+  --success: #10b981;
+  --error: #ef4444;
+  --neutral-100: #f3f4f6;
+  --neutral-200: #e5e7eb;
+  --neutral-700: #374151;
+  --neutral-900: #111827;
+}
+
+/* Product Card Component */
+.product-card {
+  /* Your styles here */
+}
+
+/* Notification Toast Component */
+.toast {
+  /* Your styles here */
+}
+
+/* Custom Dropdown Component */
+.dropdown {
+  /* Your styles here */
+}
+
+/* Content Loader Component */
+.skeleton {
+  /* Your styles here */
+}`,
     },
   ],
   'JavaScript': [
@@ -204,6 +290,112 @@ getUserWithPosts(1).then(data => {
 }).catch(error => {
   console.error('Failed to fetch data:', error);
 });`,
+    },
+    {
+      type: 'debugging',
+      title: 'Fix Browser Compatibility Issues',
+      description: 'The provided JavaScript code works in modern browsers but has compatibility issues in older browsers. Identify and fix the problems to ensure the code works across all major browsers including IE11, older versions of Safari, and mobile browsers.',
+      timeAllotted: 30,
+      codeSnippet: `// This utility library has browser compatibility issues
+const DOMUtils = {
+  // Select elements with a CSS selector
+  select(selector, parent = document) {
+    return [...parent.querySelectorAll(selector)];
+  },
+  
+  // Add event listener with options
+  addEvent(element, event, handler, options = { passive: true }) {
+    element.addEventListener(event, handler, options);
+    return () => element.removeEventListener(event, handler, options);
+  },
+  
+  // Create element with attributes and children
+  createElement(tag, attributes = {}, ...children) {
+    const element = document.createElement(tag);
+    
+    Object.entries(attributes).forEach(([key, value]) => {
+      if (key === 'className') {
+        element.className = value;
+      } else if (key === 'dataset') {
+        Object.entries(value).forEach(([dataKey, dataValue]) => {
+          element.dataset[dataKey] = dataValue;
+        });
+      } else if (key === 'style') {
+        Object.entries(value).forEach(([prop, val]) => {
+          element.style[prop] = val;
+        });
+      } else {
+        element.setAttribute(key, value);
+      }
+    });
+    
+    children.forEach(child => {
+      if (typeof child === 'string') {
+        element.appendChild(document.createTextNode(child));
+      } else if (child instanceof Node) {
+        element.appendChild(child);
+      }
+    });
+    
+    return element;
+  },
+  
+  // Add/remove classes
+  toggleClass(element, className, force) {
+    element.classList.toggle(className, force);
+  },
+  
+  // Animation helper
+  animate(element, keyframes, options) {
+    return element.animate(keyframes, options).finished;
+  },
+  
+  // Local storage wrapper
+  storage: {
+    get(key) {
+      const value = localStorage.getItem(key);
+      return value ? JSON.parse(value) : null;
+    },
+    set(key, value) {
+      localStorage.setItem(key, JSON.stringify(value));
+    },
+    remove(key) {
+      localStorage.removeItem(key);
+    }
+  }
+};
+
+// Usage example
+document.addEventListener('DOMContentLoaded', () => {
+  const buttons = DOMUtils.select('.action-button');
+  
+  buttons.forEach(button => {
+    DOMUtils.addEvent(button, 'click', async () => {
+      const { id } = button.dataset;
+      const result = await fetchData(id);
+      
+      const resultElement = DOMUtils.createElement('div', 
+        { className: 'result', dataset: { id } },
+        DOMUtils.createElement('h3', {}, 'Result'),
+        DOMUtils.createElement('pre', {}, JSON.stringify(result, null, 2))
+      );
+      
+      document.body.appendChild(resultElement);
+      
+      DOMUtils.animate(resultElement, [
+        { opacity: 0, transform: 'translateY(20px)' },
+        { opacity: 1, transform: 'translateY(0)' }
+      ], { duration: 300, easing: 'ease-out' });
+      
+      DOMUtils.storage.set('lastResult', result);
+    });
+  });
+});
+
+async function fetchData(id) {
+  const response = await fetch(\`https://api.example.com/data/\${id}\`);
+  return response.json();
+}`,
     },
     {
       type: 'thought-process',
@@ -437,6 +629,198 @@ async function fetchUserData(id: number) {
   
   user.lastLogin = new Date(); // Type error: adding property to User
   return { user, similarUsers };
+}`,
+    },
+    {
+      type: 'debugging',
+      title: 'Fix TypeScript Interface Implementation Errors',
+      description: 'The provided TypeScript code has several implementation errors where classes don\'t properly implement their interfaces. Identify and fix all the type errors while ensuring the code maintains its intended functionality.',
+      timeAllotted: 35,
+      codeSnippet: `// Authentication system with TypeScript errors
+
+// User interfaces
+interface UserCredentials {
+  email: string;
+  password: string;
+}
+
+interface UserProfile {
+  id: string;
+  email: string;
+  displayName: string;
+  isActive: boolean;
+  role: UserRole;
+  preferences: UserPreferences;
+  lastLogin?: Date;
+}
+
+type UserRole = 'admin' | 'editor' | 'viewer';
+
+interface UserPreferences {
+  theme: 'light' | 'dark' | 'system';
+  notifications: boolean;
+  language: string;
+}
+
+// Authentication interfaces
+interface AuthService {
+  login(credentials: UserCredentials): Promise<AuthResult>;
+  register(user: UserRegistrationData): Promise<AuthResult>;
+  logout(): Promise<void>;
+  getCurrentUser(): UserProfile | null;
+  updateProfile(userId: string, data: Partial<UserProfile>): Promise<UserProfile>;
+  changePassword(userId: string, oldPassword: string, newPassword: string): Promise<boolean>;
+}
+
+interface AuthResult {
+  user: UserProfile;
+  token: string;
+  expiresAt: Date;
+}
+
+interface UserRegistrationData extends UserCredentials {
+  displayName: string;
+  role?: UserRole;
+}
+
+// Implementation with errors
+class ApiAuthService implements AuthService {
+  private apiBaseUrl: string;
+  private currentUser: UserProfile | null = null;
+  private authToken: string | null = null;
+  
+  constructor(apiBaseUrl: string) {
+    this.apiBaseUrl = apiBaseUrl;
+  }
+  
+  // This implementation has errors
+  async login(credentials: UserCredentials): Promise<AuthResult> {
+    try {
+      const response = await fetch(\`\${this.apiBaseUrl}/login\`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials)
+      });
+      
+      if (!response.ok) throw new Error('Login failed');
+      
+      const data = await response.json();
+      this.currentUser = data.user;
+      this.authToken = data.token;
+      
+      return {
+        user: data.user,
+        token: data.token,
+        // Missing expiresAt property
+      };
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
+  }
+  
+  // This implementation has errors
+  async register(user: UserRegistrationData): Promise<AuthResult> {
+    const response = await fetch(\`\${this.apiBaseUrl}/register\`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(user)
+    });
+    
+    if (!response.ok) throw new Error('Registration failed');
+    
+    const data = await response.json();
+    return data; // This doesn't match the AuthResult interface
+  }
+  
+  // This implementation has errors
+  logout() {
+    this.currentUser = null;
+    this.authToken = null;
+    // Should return Promise<void>
+  }
+  
+  getCurrentUser(): UserProfile {
+    return this.currentUser;
+  }
+  
+  // This implementation has errors
+  async updateProfile(userId: string, data: UserProfile): Promise<UserProfile> {
+    if (!this.authToken) throw new Error('Not authenticated');
+    
+    const response = await fetch(\`\${this.apiBaseUrl}/users/\${userId}\`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': \`Bearer \${this.authToken}\`
+      },
+      body: JSON.stringify(data)
+    });
+    
+    if (!response.ok) throw new Error('Failed to update profile');
+    
+    const updatedUser = await response.json();
+    if (this.currentUser && this.currentUser.id === userId) {
+      this.currentUser = updatedUser;
+    }
+    
+    return updatedUser;
+  }
+  
+  // This implementation has errors
+  async changePassword(userId: string, oldPassword: string, newPassword: string) {
+    if (!this.authToken) throw new Error('Not authenticated');
+    
+    const response = await fetch(\`\${this.apiBaseUrl}/users/\${userId}/password\`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': \`Bearer \${this.authToken}\`
+      },
+      body: JSON.stringify({ oldPassword, newPassword })
+    });
+    
+    return response.ok;
+  }
+}
+
+// Usage example with errors
+async function authenticateUser() {
+  const authService = new ApiAuthService('https://api.example.com');
+  
+  try {
+    // Login with errors
+    const loginResult = await authService.login({
+      email: 'user@example.com',
+      password: 'password123',
+      rememberMe: true // Extra property not in interface
+    });
+    
+    // Get current user with errors
+    const user = authService.getCurrentUser();
+    if (user === null) {
+      console.log('No user logged in');
+      return;
+    }
+    
+    // Update profile with errors
+    const updatedUser = await authService.updateProfile(user.id, {
+      displayName: 'New Name',
+      theme: 'dark' // This is nested under preferences
+    });
+    
+    console.log('Updated user:', updatedUser);
+    
+    // Change password with errors
+    const passwordChanged = await authService.changePassword(user.id, 'oldpass', 'newpass');
+    console.log('Password changed:', passwordChanged);
+    
+    // Logout with errors
+    authService.logout();
+    
+  } catch (error) {
+    console.error('Authentication error:', error);
+  }
 }`,
     },
     {
@@ -739,6 +1123,280 @@ const salesData = [
 export default function Dashboard() {
   // Your implementation here
 }`,
+    },
+    {
+      type: 'ui-implementation',
+      title: 'Build a Component Library of UI Elements',
+      description: 'Create a collection of reusable UI components including: 1) A responsive card component with various layouts, 2) A notification system with different states (success, error, warning, info), 3) A tabbed interface component, and 4) A modal/dialog component with customizable content. Focus on accessibility, responsive design, and component composition.',
+      timeAllotted: 45,
+      codeSnippet: `import React from 'react';
+
+// Card Component
+interface CardProps {
+  title: string;
+  children: React.ReactNode;
+  variant?: 'default' | 'compact' | 'featured';
+  image?: string;
+  actions?: React.ReactNode;
+}
+
+export function Card({ title, children, variant = 'default', image, actions }: CardProps) {
+  // Implement card component
+  return null;
+}
+
+// Notification Component
+interface NotificationProps {
+  type: 'success' | 'error' | 'warning' | 'info';
+  message: string;
+  duration?: number;
+  onClose?: () => void;
+}
+
+export function Notification({ type, message, duration = 3000, onClose }: NotificationProps) {
+  // Implement notification component
+  return null;
+}
+
+// Tabs Component
+interface TabsProps {
+  tabs: {
+    id: string;
+    label: string;
+    content: React.ReactNode;
+  }[];
+  defaultActiveTab?: string;
+  onChange?: (tabId: string) => void;
+}
+
+export function Tabs({ tabs, defaultActiveTab, onChange }: TabsProps) {
+  // Implement tabs component
+  return null;
+}
+
+// Modal Component
+interface ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+  footer?: React.ReactNode;
+  size?: 'small' | 'medium' | 'large';
+}
+
+export function Modal({ isOpen, onClose, title, children, footer, size = 'medium' }: ModalProps) {
+  // Implement modal component
+  return null;
+}
+
+// Demo Component to showcase all components
+export default function ComponentLibrary() {
+  // Create a demo page showcasing all components with various configurations
+  return null;
+}`,
+    },
+    {
+      type: 'debugging',
+      title: 'Fix React Hook and State Management Issues',
+      description: 'The provided React application has several issues with hook usage, state management, and component lifecycle. Identify and fix problems related to hook dependencies, state updates, and effect cleanup. Ensure the application follows React best practices and doesn\'t have memory leaks or unnecessary re-renders.',
+      timeAllotted: 40,
+      codeSnippet: `import React, { useState, useEffect, useCallback, useMemo } from 'react';
+
+// This is a component with various hook and state management issues
+function UserDashboard({ userId }) {
+  // User state
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  // Activity tracking
+  const [activities, setActivities] = useState([]);
+  const [activityFilter, setActivityFilter] = useState('all');
+  
+  // Notification system
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  
+  // Settings
+  const [settings, setSettings] = useState({
+    emailNotifications: true,
+    darkMode: false,
+    language: 'en',
+  });
+  
+  // Fetch user data - has issues
+  useEffect(() => {
+    let isMounted = true;
+    
+    async function fetchUserData() {
+      try {
+        setLoading(true);
+        const response = await fetch(\`/api/users/\${userId}\`);
+        const userData = await response.json();
+        
+        // This state update might happen after unmount
+        setUser(userData);
+        setLoading(false);
+      } catch (err) {
+        setError('Failed to fetch user data');
+        setLoading(false);
+      }
+    }
+    
+    fetchUserData();
+    
+    // Missing cleanup function
+  }, [userId]);
+  
+  // Fetch activities - has dependency issues
+  useEffect(() => {
+    async function fetchActivities() {
+      const response = await fetch(\`/api/users/\${userId}/activities?filter=\${activityFilter}\`);
+      const data = await response.json();
+      setActivities(data);
+    }
+    
+    fetchActivities();
+    
+    // This sets up a polling interval but doesn't clean it up
+    const interval = setInterval(() => {
+      fetchActivities();
+    }, 30000);
+  }, []); // Missing dependencies
+  
+  // Real-time notifications - has issues
+  useEffect(() => {
+    // This simulates a WebSocket connection
+    const ws = new WebSocket('wss://api.example.com/notifications');
+    
+    ws.onmessage = (event) => {
+      const newNotification = JSON.parse(event.data);
+      // This creates a new array on every message
+      setNotifications([...notifications, newNotification]);
+    };
+    
+    // Missing cleanup
+  }, [notifications]); // Problematic dependency
+  
+  // This callback has dependency issues
+  const handleSettingChange = useCallback((key, value) => {
+    setSettings({
+      ...settings,
+      [key]: value
+    });
+    
+    // This API call should happen in an effect
+    fetch(\`/api/users/\${userId}/settings\`, {
+      method: 'PATCH',
+      body: JSON.stringify({ [key]: value })
+    });
+  }, []); // Missing dependencies
+  
+  // This memo has issues
+  const filteredActivities = useMemo(() => {
+    return activities.filter(activity => {
+      if (activityFilter === 'all') return true;
+      return activity.type === activityFilter;
+    });
+  }, []); // Missing dependencies
+  
+  // This function creates a new object on every render
+  const userStats = {
+    totalActivities: activities.length,
+    completedActivities: activities.filter(a => a.status === 'completed').length,
+    pendingActivities: activities.filter(a => a.status === 'pending').length
+  };
+  
+  // This should be memoized
+  function getActivityIcon(type) {
+    switch(type) {
+      case 'comment': return '💬';
+      case 'like': return '👍';
+      case 'share': return '🔄';
+      default: return '📝';
+    }
+  }
+  
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
+  
+  return (
+    <div className="dashboard">
+      <header>
+        <h1>Welcome, {user?.name}</h1>
+        <button onClick={() => setShowNotifications(!showNotifications)}>
+          Notifications ({notifications.length})
+        </button>
+      </header>
+      
+      {showNotifications && (
+        <div className="notifications-panel">
+          {notifications.map(notification => (
+            <div key={notification.id} className="notification">
+              {notification.message}
+            </div>
+          ))}
+        </div>
+      )}
+      
+      <div className="stats">
+        <div>Total Activities: {userStats.totalActivities}</div>
+        <div>Completed: {userStats.completedActivities}</div>
+        <div>Pending: {userStats.pendingActivities}</div>
+      </div>
+      
+      <div className="activities">
+        <h2>Recent Activities</h2>
+        <div className="filters">
+          <button onClick={() => setActivityFilter('all')}>All</button>
+          <button onClick={() => setActivityFilter('comment')}>Comments</button>
+          <button onClick={() => setActivityFilter('like')}>Likes</button>
+          <button onClick={() => setActivityFilter('share')}>Shares</button>
+        </div>
+        
+        <ul>
+          {filteredActivities.map(activity => (
+            <li key={activity.id}>
+              {getActivityIcon(activity.type)} {activity.description}
+            </li>
+          ))}
+        </ul>
+      </div>
+      
+      <div className="settings">
+        <h2>Settings</h2>
+        <label>
+          <input
+            type="checkbox"
+            checked={settings.emailNotifications}
+            onChange={(e) => handleSettingChange('emailNotifications', e.target.checked)}
+          />
+          Email Notifications
+        </label>
+        
+        <label>
+          <input
+            type="checkbox"
+            checked={settings.darkMode}
+            onChange={(e) => handleSettingChange('darkMode', e.target.checked)}
+          />
+          Dark Mode
+        </label>
+        
+        <select
+          value={settings.language}
+          onChange={(e) => handleSettingChange('language', e.target.value)}
+        >
+          <option value="en">English</option>
+          <option value="es">Spanish</option>
+          <option value="fr">French</option>
+        </select>
+      </div>
+    </div>
+  );
+}
+
+export default UserDashboard;`,
     },
   ],
   'Vue': [

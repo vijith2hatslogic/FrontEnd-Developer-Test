@@ -52,6 +52,15 @@ export default function SubmissionView({ params }: PageProps) {
           return
         }
         
+        console.log('Submission data loaded:', {
+          submissionId: submissionData.id,
+          taskSubmissionsType: typeof submissionData.taskSubmissions,
+          isArray: Array.isArray(submissionData.taskSubmissions),
+          taskSubmissionsLength: Array.isArray(submissionData.taskSubmissions) 
+            ? submissionData.taskSubmissions.length 
+            : 'Not an array'
+        })
+        
         setSubmission(submissionData)
       } catch (err) {
         console.error('Error fetching data:', err)
@@ -161,6 +170,60 @@ export default function SubmissionView({ params }: PageProps) {
                   <h3 className="text-sm text-gray-500">Time Spent</h3>
                   <p>{formatTimeSpent(submission.timeSpent)}</p>
                 </div>
+                
+                <div className="pt-4 border-t">
+                  <h3 className="text-sm text-gray-500 font-medium mb-2">Monitoring Recordings</h3>
+                  
+                  {submission.webcamRecording ? (
+                    <div className="mb-4">
+                      <h4 className="text-sm font-medium mb-2">Webcam Recording</h4>
+                      <div className="border rounded overflow-hidden">
+                        {submission.webcamRecording.startsWith('data:image') ? (
+                          // Display as image if it's a screenshot
+                          <img 
+                            src={submission.webcamRecording} 
+                            alt="Webcam capture" 
+                            className="w-full"
+                          />
+                        ) : (
+                          // Try to display as video if it's not an image
+                          <video 
+                            controls 
+                            className="w-full"
+                            src={submission.webcamRecording}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 mb-2">No webcam recording available.</p>
+                  )}
+                  
+                  {submission.screenRecording ? (
+                    <div className="mb-4">
+                      <h4 className="text-sm font-medium mb-2">Screen Recording</h4>
+                      <div className="border rounded overflow-hidden">
+                        {submission.screenRecording.startsWith('data:image') ? (
+                          // Display as image if it's a screenshot
+                          <img 
+                            src={submission.screenRecording} 
+                            alt="Screen capture" 
+                            className="w-full"
+                          />
+                        ) : (
+                          // Try to display as video if it's not an image
+                          <video 
+                            controls 
+                            className="w-full"
+                            src={submission.screenRecording}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 mb-2">No screen recording available.</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -170,7 +233,12 @@ export default function SubmissionView({ params }: PageProps) {
               <h2 className="text-xl font-semibold mb-4">Task Submissions</h2>
               
               {test.tasks.map((task, index) => {
-                const taskSubmission = submission.taskSubmissions.find(
+                // Ensure taskSubmissions is an array
+                const taskSubmissionsArray = Array.isArray(submission.taskSubmissions) 
+                  ? submission.taskSubmissions 
+                  : [];
+                
+                const taskSubmission = taskSubmissionsArray.find(
                   (ts) => ts.taskId === index
                 ) || { taskId: index, answer: '' }
                 

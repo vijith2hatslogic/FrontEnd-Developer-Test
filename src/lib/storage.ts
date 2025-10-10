@@ -67,6 +67,8 @@ export interface TestSubmission {
   taskSubmissions: TaskSubmission[]
   submittedAt: string
   timeSpent: number
+  webcamRecording?: string // URL or data for webcam recording
+  screenRecording?: string // URL or data for screen recording
 }
 
 // Helper function to hash passwords
@@ -258,19 +260,38 @@ export const storageService = {
           candidate_email: string;
           candidate_phone?: string;
           years_of_experience: string;
-          task_submissions: TaskSubmission[];
+          task_submissions: string | TaskSubmission[];
           submitted_at: string;
           time_spent: number;
-        }) => ({
-          id: submission.id,
-          candidateName: submission.candidate_name,
-          candidateEmail: submission.candidate_email,
-          candidatePhone: submission.candidate_phone,
-          yearsOfExperience: submission.years_of_experience,
-          taskSubmissions: submission.task_submissions as TaskSubmission[],
-          submittedAt: submission.submitted_at,
-          timeSpent: submission.time_spent
-        }))
+          webcam_recording?: string;
+          screen_recording?: string;
+        }) => {
+          // Parse task_submissions if it's a string
+          let taskSubmissions: TaskSubmission[];
+          if (typeof submission.task_submissions === 'string') {
+            try {
+              taskSubmissions = JSON.parse(submission.task_submissions);
+            } catch (e) {
+              console.error('Error parsing task submissions:', e);
+              taskSubmissions = [];
+            }
+          } else {
+            taskSubmissions = submission.task_submissions as TaskSubmission[];
+          }
+          
+          return {
+            id: submission.id,
+            candidateName: submission.candidate_name,
+            candidateEmail: submission.candidate_email,
+            candidatePhone: submission.candidate_phone,
+            yearsOfExperience: submission.years_of_experience,
+            taskSubmissions,
+            submittedAt: submission.submitted_at,
+            timeSpent: submission.time_spent,
+            webcamRecording: submission.webcam_recording,
+            screenRecording: submission.screen_recording
+          };
+        })
       }));
     } catch (error) {
       console.error('Error fetching tests:', error);
@@ -309,19 +330,38 @@ export const storageService = {
           candidate_email: string;
           candidate_phone?: string;
           years_of_experience: string;
-          task_submissions: TaskSubmission[];
+          task_submissions: string | TaskSubmission[];
           submitted_at: string;
           time_spent: number;
-        }) => ({
-          id: submission.id,
-          candidateName: submission.candidate_name,
-          candidateEmail: submission.candidate_email,
-          candidatePhone: submission.candidate_phone,
-          yearsOfExperience: submission.years_of_experience,
-          taskSubmissions: submission.task_submissions as TaskSubmission[],
-          submittedAt: submission.submitted_at,
-          timeSpent: submission.time_spent
-        }))
+          webcam_recording?: string;
+          screen_recording?: string;
+        }) => {
+          // Parse task_submissions if it's a string
+          let taskSubmissions: TaskSubmission[];
+          if (typeof submission.task_submissions === 'string') {
+            try {
+              taskSubmissions = JSON.parse(submission.task_submissions);
+            } catch (e) {
+              console.error('Error parsing task submissions:', e);
+              taskSubmissions = [];
+            }
+          } else {
+            taskSubmissions = submission.task_submissions as TaskSubmission[];
+          }
+          
+          return {
+            id: submission.id,
+            candidateName: submission.candidate_name,
+            candidateEmail: submission.candidate_email,
+            candidatePhone: submission.candidate_phone,
+            yearsOfExperience: submission.years_of_experience,
+            taskSubmissions,
+            submittedAt: submission.submitted_at,
+            timeSpent: submission.time_spent,
+            webcamRecording: submission.webcam_recording,
+            screenRecording: submission.screen_recording
+          };
+        })
       };
     } catch (error) {
       console.error('Error fetching test by ID:', error);
@@ -360,19 +400,38 @@ export const storageService = {
           candidate_email: string;
           candidate_phone?: string;
           years_of_experience: string;
-          task_submissions: TaskSubmission[];
+          task_submissions: string | TaskSubmission[];
           submitted_at: string;
           time_spent: number;
-        }) => ({
-          id: submission.id,
-          candidateName: submission.candidate_name,
-          candidateEmail: submission.candidate_email,
-          candidatePhone: submission.candidate_phone,
-          yearsOfExperience: submission.years_of_experience,
-          taskSubmissions: submission.task_submissions as TaskSubmission[],
-          submittedAt: submission.submitted_at,
-          timeSpent: submission.time_spent
-        }))
+          webcam_recording?: string;
+          screen_recording?: string;
+        }) => {
+          // Parse task_submissions if it's a string
+          let taskSubmissions: TaskSubmission[];
+          if (typeof submission.task_submissions === 'string') {
+            try {
+              taskSubmissions = JSON.parse(submission.task_submissions);
+            } catch (e) {
+              console.error('Error parsing task submissions:', e);
+              taskSubmissions = [];
+            }
+          } else {
+            taskSubmissions = submission.task_submissions as TaskSubmission[];
+          }
+          
+          return {
+            id: submission.id,
+            candidateName: submission.candidate_name,
+            candidateEmail: submission.candidate_email,
+            candidatePhone: submission.candidate_phone,
+            yearsOfExperience: submission.years_of_experience,
+            taskSubmissions,
+            submittedAt: submission.submitted_at,
+            timeSpent: submission.time_spent,
+            webcamRecording: submission.webcam_recording,
+            screenRecording: submission.screen_recording
+          };
+        })
       };
     } catch (error) {
       console.error('Error fetching test by URL:', error);
@@ -483,48 +542,121 @@ export const storageService = {
   
   addSubmission: async (testId: string, submission: Omit<TestSubmission, 'id' | 'submittedAt'>): Promise<TestSubmission> => {
     try {
+      // Validate inputs
+      if (!testId) {
+        throw new Error('Test ID is required');
+      }
+      
+      if (!submission.candidateName || !submission.candidateEmail) {
+        throw new Error('Candidate name and email are required');
+      }
+      
+      // Process recording data
+      // Base64 data can be very large and might exceed database limits
+      let webcamRecording = submission.webcamRecording || null;
+      let screenRecording = submission.screenRecording || null;
+      
+      // For very large recordings, we'll store them in chunks
+      // This is a simplified approach - in production, you'd use a blob storage solution
+      const maxChunkSize = 1024 * 1024; // 1MB per chunk
+      
+      console.log('Original recording sizes:', {
+        webcamSize: webcamRecording ? webcamRecording.length : 0,
+        screenSize: screenRecording ? screenRecording.length : 0
+      });
+      
+      // We'll use the first chunk for immediate display and store the full data
+      // in a more appropriate storage solution in a real-world scenario
+      if (webcamRecording && webcamRecording.length > maxChunkSize) {
+        console.warn(`Webcam recording data large (${Math.round(webcamRecording.length/1024)}KB), using first chunk`);
+        // Keep the data type prefix (e.g., "data:video/webm;base64,")
+        const dataTypePrefix = webcamRecording.substring(0, webcamRecording.indexOf('base64,') + 7);
+        const base64Data = webcamRecording.substring(webcamRecording.indexOf('base64,') + 7);
+        
+        // Use first chunk but keep the data type prefix
+        webcamRecording = dataTypePrefix + base64Data.substring(0, maxChunkSize);
+        console.log('Truncated webcam recording to:', Math.round(webcamRecording.length/1024), 'KB');
+      }
+      
+      if (screenRecording && screenRecording.length > maxChunkSize) {
+        console.warn(`Screen recording data large (${Math.round(screenRecording.length/1024)}KB), using first chunk`);
+        // Keep the data type prefix (e.g., "data:video/webm;base64,")
+        const dataTypePrefix = screenRecording.substring(0, screenRecording.indexOf('base64,') + 7);
+        const base64Data = screenRecording.substring(screenRecording.indexOf('base64,') + 7);
+        
+        // Use first chunk but keep the data type prefix
+        screenRecording = dataTypePrefix + base64Data.substring(0, maxChunkSize);
+        console.log('Truncated screen recording to:', Math.round(screenRecording.length/1024), 'KB');
+      }
+      
+      // Create submission with validated data
       const submissionId = uuidv4();
       const submittedAt = new Date().toISOString();
+      
+      // Prepare submission data with proper types
+      const submissionData = {
+        id: submissionId,
+        test_id: testId,
+        candidate_name: submission.candidateName,
+        candidate_email: submission.candidateEmail,
+        candidate_phone: submission.candidatePhone || null,
+        years_of_experience: submission.yearsOfExperience || 'Not specified',
+        task_submissions: JSON.stringify(submission.taskSubmissions),
+        submitted_at: submittedAt,
+        time_spent: submission.timeSpent || 0,
+        webcam_recording: webcamRecording,
+        screen_recording: screenRecording
+      };
+      
+      console.log('Submitting data to Supabase:', {
+        ...submissionData,
+        webcamRecordingSize: webcamRecording ? `${Math.round(webcamRecording.length / 1024)} KB` : 'None',
+        screenRecordingSize: screenRecording ? `${Math.round(screenRecording.length / 1024)} KB` : 'None'
+      });
       
       // Start a transaction to add submission and expire the test URL
       const { data, error: submissionError } = await supabase
         .from('test_submissions')
-        .insert({
-          id: submissionId,
-          test_id: testId,
-          candidate_name: submission.candidateName,
-          candidate_email: submission.candidateEmail,
-          candidate_phone: submission.candidatePhone || null,
-          years_of_experience: submission.yearsOfExperience,
-          task_submissions: submission.taskSubmissions,
-          submitted_at: submittedAt,
-          time_spent: submission.timeSpent
-        })
+        .insert(submissionData)
         .select();
       
       if (submissionError) {
-        throw submissionError;
+        console.error('Supabase submission error:', submissionError);
+        throw new Error(`Failed to add submission: ${submissionError.message}`);
       }
       
       // Expire the test URL
-      const { error: updateError } = await supabase
-        .from('tests')
-        .update({ is_expired: true })
-        .eq('id', testId);
-      
-      if (updateError) {
-        console.error('Error expiring test URL:', updateError);
-        // We don't throw here to still return the submission
+      try {
+        const { error: updateError } = await supabase
+          .from('tests')
+          .update({ is_expired: true })
+          .eq('id', testId);
+        
+        if (updateError) {
+          console.error('Error expiring test URL:', updateError);
+          // We don't throw here to still return the submission
+        }
+      } catch (updateErr) {
+        console.error('Exception while expiring test URL:', updateErr);
+        // Continue anyway
       }
       
       // Return the created submission
       return {
         ...submission,
         id: submissionId,
-        submittedAt
+        submittedAt,
+        // Return the potentially truncated recordings
+        webcamRecording,
+        screenRecording
       };
     } catch (error) {
       console.error('Error adding submission:', error);
+      // Log more details about the error
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
       throw error;
     }
   },

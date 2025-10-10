@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/auth/AuthProvider'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
-import { storageService, Test } from '@/lib/storage'
+import { storageService, Test, TestSubmission } from '@/lib/storage'
 
 interface PageProps {
   params: { id: string };
@@ -16,9 +16,25 @@ export default function TestView({ params }: PageProps) {
   const [test, setTest] = useState<Test | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [viewedSubmissions, setViewedSubmissions] = useState<Set<string>>(new Set())
   const { user } = useAuth()
   const router = useRouter()
   const testId = use(params).id
+  
+  // Load viewed submissions from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedViewedSubmissions = localStorage.getItem(`viewed_submissions_${testId}`);
+      if (storedViewedSubmissions) {
+        try {
+          const parsed = JSON.parse(storedViewedSubmissions);
+          setViewedSubmissions(new Set(parsed));
+        } catch (e) {
+          console.error('Error parsing viewed submissions:', e);
+        }
+      }
+    }
+  }, [testId])
   
   useEffect(() => {
     const fetchTest = async () => {
@@ -217,23 +233,48 @@ export default function TestView({ params }: PageProps) {
               
               {test.submissions && test.submissions.length > 0 ? (
                 <div className="space-y-3">
-                  {test.submissions.map((submission, index) => (
-                    <div key={index} className="border p-3 rounded">
-                      <div className="flex justify-between">
-                        <span className="font-medium">{submission.candidateName}</span>
-                        <span className="text-sm text-gray-500">
-                          {new Date(submission.submittedAt).toLocaleDateString()}
-                        </span>
+                  {test.submissions.map((submission, index) => {
+                    const isNew = !viewedSubmissions.has(submission.id);
+                    
+                    return (
+                      <div key={index} className="border p-3 rounded">
+                        <div className="flex justify-between">
+                          <div className="flex items-center">
+                            <span className="font-medium">{submission.candidateName}</span>
+                            {isNew && (
+                              <span className="ml-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                                New
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-sm text-gray-500">
+                            {new Date(submission.submittedAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-sm">{submission.candidateEmail}</p>
+                        <Link
+                          href={`/dashboard/tests/${test.id}/submissions/${submission.id}`}
+                          className="text-primary hover:underline text-sm mt-2 inline-block"
+                          onClick={() => {
+                            // Mark as viewed when clicked
+                            const newViewedSubmissions = new Set(viewedSubmissions);
+                            newViewedSubmissions.add(submission.id);
+                            setViewedSubmissions(newViewedSubmissions);
+                            
+                            // Save to localStorage
+                            if (typeof window !== 'undefined') {
+                              localStorage.setItem(
+                                `viewed_submissions_${test.id}`,
+                                JSON.stringify([...newViewedSubmissions])
+                              );
+                            }
+                          }}
+                        >
+                          View Submission
+                        </Link>
                       </div>
-                      <p className="text-sm">{submission.candidateEmail}</p>
-                      <Link
-                        href={`/dashboard/tests/${test.id}/submissions/${submission.id}`}
-                        className="text-primary hover:underline text-sm mt-2 inline-block"
-                      >
-                        View Submission
-                      </Link>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-gray-500">No submissions yet.</p>
