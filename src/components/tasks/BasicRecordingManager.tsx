@@ -1,21 +1,33 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { uploadToWistia, WistiaVideoInfo } from '@/lib/wistiaService';
 
 interface BasicRecordingManagerProps {
-  onWebcamRecordingComplete: (recordingData: string) => void;
-  onScreenRecordingComplete: (recordingData: string) => void;
+  onWebcamRecordingComplete: (recordingData: string, shareUrl?: string) => void;
+  onScreenRecordingComplete: (recordingData: string, shareUrl?: string) => void;
+  onRecordingStart?: () => void; // NEW: Called when recording actually starts
+  onUploadingChange?: (isUploading: boolean) => void; // NEW: notify parent of upload state
+  onProgressChange?: (payload: { kind: 'webcam' | 'screen'; percent: number }) => void; // NEW: per-stream progress
+  candidateName?: string;
 }
 
 const BasicRecordingManager: React.FC<BasicRecordingManagerProps> = ({
   onWebcamRecordingComplete,
   onScreenRecordingComplete,
+  onRecordingStart,
+  onUploadingChange,
+  onProgressChange,
+  candidateName = 'Candidate',
 }) => {
   const [webcamPermissionGranted, setWebcamPermissionGranted] = useState(false);
   const [screenPermissionGranted, setScreenPermissionGranted] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recordingStatus, setRecordingStatus] = useState('');
+  const [uploadingToWistia, setUploadingToWistia] = useState(false);
+  const [webcamProgress, setWebcamProgress] = useState<number | null>(null);
+  const [screenProgress, setScreenProgress] = useState<number | null>(null);
   
   const webcamVideoRef = useRef<HTMLVideoElement>(null);
   const screenVideoRef = useRef<HTMLVideoElement>(null);
@@ -126,23 +138,24 @@ const BasicRecordingManager: React.FC<BasicRecordingManagerProps> = ({
         return;
       }
       
+      // Ensure we actually have active tracks
+      if (
+        webcamStreamRef.current.getVideoTracks().length === 0 ||
+        screenStreamRef.current.getVideoTracks().length === 0
+      ) {
+        setError('No active video tracks found. Please re-enable webcam and screen sharing.');
+        return;
+      }
+      
       setRecordingStatus('Starting recording...');
       
-      // Take initial screenshots immediately to ensure we have something
-      // This will also trigger the recordingStarted state in the parent component
-      if (webcamStreamRef.current) {
-        const webcamScreenshot = await captureScreenshot(webcamStreamRef.current);
-        onWebcamRecordingComplete(webcamScreenshot);
-      }
-      
-      if (screenStreamRef.current) {
-        const screenScreenshot = await captureScreenshot(screenStreamRef.current);
-        onScreenRecordingComplete(screenScreenshot);
-      }
-      
-      // Set recording started immediately
+      // Set recording started immediately (don't send initial screenshots)
       setIsRecording(true);
-      setRecordingStarted(true);
+      
+      // Notify parent that recording has started (so questions can show)
+      if (onRecordingStart) {
+        onRecordingStart();
+      }
       
       // Reset chunks for video recording
       webcamChunksRef.current = [];
@@ -150,19 +163,37 @@ const BasicRecordingManager: React.FC<BasicRecordingManagerProps> = ({
       
       if (isMediaRecorderSupported) {
         try {
-          // Try to determine supported mime type
-          let mimeType = 'video/webm';
-          if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
-            mimeType = 'video/webm;codecs=vp9';
-          } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) {
-            mimeType = 'video/webm;codecs=vp8';
+          // Determine a supported mime type with graceful fallback
+          const candidateMimeTypes = [
+            'video/webm;codecs=vp9,opus',
+            'video/webm;codecs=vp8,opus',
+            'video/webm;codecs=vp9',
+            'video/webm;codecs=vp8',
+            'video/webm'
+          ];
+          let selectedMimeType: string | undefined;
+          for (const candidate of candidateMimeTypes) {
+            if ((window as any).MediaRecorder && MediaRecorder.isTypeSupported(candidate)) {
+              selectedMimeType = candidate;
+              break;
+            }
           }
+          // If none explicitly supported, allow browser default by leaving undefined
+          const mimeType = selectedMimeType;
           
           // Create webcam recorder
-          webcamRecorderRef.current = new MediaRecorder(webcamStreamRef.current, {
-            mimeType,
-            videoBitsPerSecond: 250000
-          });
+          try {
+            webcamRecorderRef.current = mimeType
+              ? new MediaRecorder(webcamStreamRef.current, {
+                  mimeType,
+                  videoBitsPerSecond: 250000
+                })
+              : new MediaRecorder(webcamStreamRef.current);
+          } catch (e) {
+            // Retry without options if creation failed due to mimeType
+            console.warn('Webcam MediaRecorder creation failed with mimeType, retrying without options', e);
+            webcamRecorderRef.current = new MediaRecorder(webcamStreamRef.current);
+          }
           
           webcamRecorderRef.current.ondataavailable = (event) => {
             if (event.data && event.data.size > 0) {
@@ -172,13 +203,46 @@ const BasicRecordingManager: React.FC<BasicRecordingManagerProps> = ({
           
           webcamRecorderRef.current.onstop = async () => {
             if (webcamChunksRef.current.length > 0) {
-              const blob = new Blob(webcamChunksRef.current, { type: mimeType });
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                const base64data = reader.result as string;
-                onWebcamRecordingComplete(base64data);
-              };
-              reader.readAsDataURL(blob);
+              const blobType = mimeType || 'video/webm';
+              const blob = new Blob(webcamChunksRef.current, { type: blobType });
+              
+              // Upload to Wistia
+              setUploadingToWistia(true);
+              if (onUploadingChange) onUploadingChange(true);
+              setRecordingStatus('Uploading webcam recording to Wistia...');
+              
+              try {
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const fileName = `webcam-${candidateName}-${timestamp}.webm`;
+                const description = `Webcam recording for ${candidateName}`;
+                
+                const wistiaVideo = await uploadToWistia(blob, fileName, description, (p) => {
+                  setWebcamProgress(p);
+                  if (onProgressChange) onProgressChange({ kind: 'webcam', percent: p });
+                });
+                
+                console.log('Wistia webcam upload successful:', wistiaVideo);
+                
+                // Pass the Wistia embed URL and share URL to parent
+                onWebcamRecordingComplete(wistiaVideo.embedUrl, wistiaVideo.shareUrl);
+                setRecordingStatus('Webcam recording uploaded successfully!');
+              } catch (err) {
+                console.error('Error uploading webcam to Wistia:', err);
+                
+                // Fallback to base64 if Wistia upload fails
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  const base64data = reader.result as string;
+                  onWebcamRecordingComplete(base64data);
+                };
+                reader.readAsDataURL(blob);
+                
+                setRecordingStatus('Webcam recording saved locally (Wistia upload failed)');
+              } finally {
+                setUploadingToWistia(false);
+                setWebcamProgress(null);
+                if (onUploadingChange) onUploadingChange(false);
+              }
             } else {
               // Fallback to screenshot if no data
               if (webcamStreamRef.current) {
@@ -189,10 +253,17 @@ const BasicRecordingManager: React.FC<BasicRecordingManagerProps> = ({
           };
           
           // Create screen recorder
-          screenRecorderRef.current = new MediaRecorder(screenStreamRef.current, {
-            mimeType,
-            videoBitsPerSecond: 1000000
-          });
+          try {
+            screenRecorderRef.current = mimeType
+              ? new MediaRecorder(screenStreamRef.current, {
+                  mimeType,
+                  videoBitsPerSecond: 1000000
+                })
+              : new MediaRecorder(screenStreamRef.current);
+          } catch (e) {
+            console.warn('Screen MediaRecorder creation failed with mimeType, retrying without options', e);
+            screenRecorderRef.current = new MediaRecorder(screenStreamRef.current);
+          }
           
           screenRecorderRef.current.ondataavailable = (event) => {
             if (event.data && event.data.size > 0) {
@@ -203,12 +274,44 @@ const BasicRecordingManager: React.FC<BasicRecordingManagerProps> = ({
           screenRecorderRef.current.onstop = async () => {
             if (screenChunksRef.current.length > 0) {
               const blob = new Blob(screenChunksRef.current, { type: mimeType });
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                const base64data = reader.result as string;
-                onScreenRecordingComplete(base64data);
-              };
-              reader.readAsDataURL(blob);
+              
+              // Upload to Wistia
+              setUploadingToWistia(true);
+              if (onUploadingChange) onUploadingChange(true);
+              setRecordingStatus('Uploading screen recording to Wistia...');
+              
+              try {
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const fileName = `screen-${candidateName}-${timestamp}.webm`;
+                const description = `Screen recording for ${candidateName}`;
+                
+                const wistiaVideo = await uploadToWistia(blob, fileName, description, (p) => {
+                  setScreenProgress(p);
+                  if (onProgressChange) onProgressChange({ kind: 'screen', percent: p });
+                });
+                
+                console.log('Wistia screen upload successful:', wistiaVideo);
+                
+                // Pass the Wistia embed URL and share URL to parent
+                onScreenRecordingComplete(wistiaVideo.embedUrl, wistiaVideo.shareUrl);
+                setRecordingStatus('Screen recording uploaded successfully!');
+              } catch (err) {
+                console.error('Error uploading screen to Wistia:', err);
+                
+                // Fallback to base64 if Wistia upload fails
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  const base64data = reader.result as string;
+                  onScreenRecordingComplete(base64data);
+                };
+                reader.readAsDataURL(blob);
+                
+                setRecordingStatus('Screen recording saved locally (Wistia upload failed)');
+              } finally {
+                setUploadingToWistia(false);
+                setScreenProgress(null);
+                if (onUploadingChange) onUploadingChange(false);
+              }
             } else {
               // Fallback to screenshot if no data
               if (screenStreamRef.current) {
@@ -218,32 +321,29 @@ const BasicRecordingManager: React.FC<BasicRecordingManagerProps> = ({
             }
           };
           
-          // Start recorders
-          webcamRecorderRef.current.start(1000);
-          screenRecorderRef.current.start(1000);
+          // Start recorders (no timeslice to avoid NotSupportedError in some browsers)
+          webcamRecorderRef.current.start();
+          screenRecorderRef.current.start();
           
           setRecordingStatus('Recording in progress...');
         } catch (err) {
           console.error('Error starting MediaRecorder:', err);
-          // We already have initial screenshots, so no need to call captureAndSaveScreenshots again
-          setRecordingStatus('Using screenshots for monitoring instead of video.');
+          setRecordingStatus('MediaRecorder failed. Will capture screenshot on stop.');
         }
       } else {
         // Fallback for browsers without MediaRecorder
-        // We already have initial screenshots, so just update the status
-        setRecordingStatus('Using screenshots for monitoring instead of video.');
+        setRecordingStatus('MediaRecorder not supported. Will capture screenshot on stop.');
       }
     } catch (err) {
       console.error('Error in startRecording:', err);
-      setError('Failed to start recording. Using screenshots instead.');
-      await captureAndSaveScreenshots();
+      setError('Failed to start recording.');
     }
   };
   
-  // Capture and save screenshots as fallback
+  // Capture and save screenshots as fallback (only used on stop if no video data)
   const captureAndSaveScreenshots = async () => {
     try {
-      setRecordingStatus('Capturing screenshots instead of video...');
+      console.log('[Recording] Capturing screenshots as fallback...');
       
       if (webcamStreamRef.current) {
         const webcamScreenshot = await captureScreenshot(webcamStreamRef.current);
@@ -254,9 +354,6 @@ const BasicRecordingManager: React.FC<BasicRecordingManagerProps> = ({
         const screenScreenshot = await captureScreenshot(screenStreamRef.current);
         onScreenRecordingComplete(screenScreenshot);
       }
-      
-      setIsRecording(true);
-      setRecordingStarted(true);
     } catch (err) {
       console.error('Error capturing screenshots:', err);
       setError('Failed to capture screenshots.');
@@ -372,7 +469,7 @@ const BasicRecordingManager: React.FC<BasicRecordingManagerProps> = ({
         {!isRecording ? (
           <button
             onClick={startRecording}
-            disabled={!webcamPermissionGranted || !screenPermissionGranted}
+            disabled={!webcamPermissionGranted || !screenPermissionGranted || uploadingToWistia}
             className="btn btn-success"
           >
             Start Recording
@@ -380,14 +477,46 @@ const BasicRecordingManager: React.FC<BasicRecordingManagerProps> = ({
         ) : (
           <button
             onClick={stopRecording}
+            disabled={uploadingToWistia}
             className="btn btn-danger"
           >
-            Stop Recording
+            {uploadingToWistia ? 'Uploading...' : 'Stop Recording'}
           </button>
         )}
         
         {recordingStatus && (
-          <p className="text-sm text-gray-600">{recordingStatus}</p>
+          <p className="text-sm text-gray-600">
+            {uploadingToWistia && (
+              <span className="inline-block mr-2">
+                <svg className="animate-spin h-4 w-4 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </span>
+            )}
+            {recordingStatus}
+          </p>
+        )}
+
+        {(webcamProgress !== null || screenProgress !== null) && (
+          <div className="w-full mt-2 space-y-2">
+            {webcamProgress !== null && (
+              <div>
+                <div className="text-xs text-gray-600 mb-1">Uploading webcam: {webcamProgress}%</div>
+                <div className="w-full bg-gray-200 rounded h-2">
+                  <div className="bg-primary h-2 rounded" style={{ width: `${webcamProgress}%` }} />
+                </div>
+              </div>
+            )}
+            {screenProgress !== null && (
+              <div>
+                <div className="text-xs text-gray-600 mb-1">Uploading screen: {screenProgress}%</div>
+                <div className="w-full bg-gray-200 rounded h-2">
+                  <div className="bg-primary h-2 rounded" style={{ width: `${screenProgress}%` }} />
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
       

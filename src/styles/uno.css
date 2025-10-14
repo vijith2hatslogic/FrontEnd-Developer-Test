@@ -83,6 +83,7 @@
 .mt-6{margin-top:1.5rem;}
 .mt-8{margin-top:2rem;}
 .last\:mb-0:last-child{margin-bottom:0;}
+.inline{display:inline;}
 .block{display:block;}
 .inline-block{display:inline-block;}
 .hidden,
@@ -93,8 +94,11 @@
 .h-3,
 .h3,
 [h3=""]{height:0.75rem;}
+.h-4,
+[h4=""]{height:1rem;}
 .h-40{height:10rem;}
 .h-8{height:2rem;}
+.h-80{height:20rem;}
 .h-96{height:24rem;}
 .h-auto{height:auto;}
 .h-full,
@@ -111,16 +115,17 @@
 .w-10{width:2.5rem;}
 .w-12{width:3rem;}
 .w-3{width:0.75rem;}
+.w-4{width:1rem;}
 .w-8{width:2rem;}
 .w-auto{width:auto;}
 .w-full,
 [w-full=""]{width:100%;}
 [h1=""]{height:0.25rem;}
 [h2=""]{height:0.5rem;}
-[h4=""]{height:1rem;}
 [h5=""]{height:1.25rem;}
 .flex,
 [flex=""]{display:flex;}
+.inline-flex{display:inline-flex;}
 .flex-1{flex:1 1 0%;}
 .flex-grow{flex-grow:1;}
 .flex-col{flex-direction:column;}
@@ -264,6 +269,8 @@
 .text-xl{font-size:1.25rem;line-height:1.75rem;}
 .text-xs{font-size:0.75rem;line-height:1rem;}
 .text-blue-700{--un-text-opacity:1;color:rgb(29 78 216 / var(--un-text-opacity)) /* #1d4ed8 */;}
+.text-blue-800{--un-text-opacity:1;color:rgb(30 64 175 / var(--un-text-opacity)) /* #1e40af */;}
+.text-blue-900{--un-text-opacity:1;color:rgb(30 58 138 / var(--un-text-opacity)) /* #1e3a8a */;}
 .text-danger{--un-text-opacity:1;color:rgb(239 68 68 / var(--un-text-opacity)) /* #EF4444 */;}
 .text-gray-400{--un-text-opacity:1;color:rgb(156 163 175 / var(--un-text-opacity)) /* #9ca3af */;}
 .text-gray-500,
@@ -300,8 +307,10 @@
 .capitalize{text-transform:capitalize;}
 .hover\:underline:hover{text-decoration-line:underline;}
 .tab{-moz-tab-size:4;-o-tab-size:4;tab-size:4;}
+.opacity-25{opacity:0.25;}
 .opacity-50,
 [opacity-50=""]{opacity:0.5;}
+.opacity-75{opacity:0.75;}
 .shadow-lg{--un-shadow:var(--un-shadow-inset) 0 10px 15px -3px var(--un-shadow-color, rgb(0 0 0 / 0.1)),var(--un-shadow-inset) 0 4px 6px -4px var(--un-shadow-color, rgb(0 0 0 / 0.1));box-shadow:var(--un-ring-offset-shadow), var(--un-ring-shadow), var(--un-shadow);}
 .shadow-sm{--un-shadow:var(--un-shadow-inset) 0 1px 2px 0 var(--un-shadow-color, rgb(0 0 0 / 0.05));box-shadow:var(--un-ring-offset-shadow), var(--un-ring-shadow), var(--un-shadow);}
 .outline-none,

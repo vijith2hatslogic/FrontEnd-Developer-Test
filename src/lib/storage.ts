@@ -67,8 +67,10 @@ export interface TestSubmission {
   taskSubmissions: TaskSubmission[]
   submittedAt: string
   timeSpent: number
-  webcamRecording?: string // URL or data for webcam recording
-  screenRecording?: string // URL or data for screen recording
+  webcamRecording?: string // Wistia embed URL or base64 data for webcam recording
+  screenRecording?: string // Wistia embed URL or base64 data for screen recording
+  webcamShareUrl?: string // Wistia shareable URL for webcam
+  screenShareUrl?: string // Wistia shareable URL for screen
 }
 
 // Helper function to hash passwords
@@ -265,6 +267,8 @@ export const storageService = {
           time_spent: number;
           webcam_recording?: string;
           screen_recording?: string;
+          webcam_share_url?: string;
+          screen_share_url?: string;
         }) => {
           // Parse task_submissions if it's a string
           let taskSubmissions: TaskSubmission[];
@@ -289,7 +293,9 @@ export const storageService = {
             submittedAt: submission.submitted_at,
             timeSpent: submission.time_spent,
             webcamRecording: submission.webcam_recording,
-            screenRecording: submission.screen_recording
+            screenRecording: submission.screen_recording,
+            webcamShareUrl: submission.webcam_share_url,
+            screenShareUrl: submission.screen_share_url
           };
         })
       }));
@@ -335,6 +341,8 @@ export const storageService = {
           time_spent: number;
           webcam_recording?: string;
           screen_recording?: string;
+          webcam_share_url?: string;
+          screen_share_url?: string;
         }) => {
           // Parse task_submissions if it's a string
           let taskSubmissions: TaskSubmission[];
@@ -359,7 +367,9 @@ export const storageService = {
             submittedAt: submission.submitted_at,
             timeSpent: submission.time_spent,
             webcamRecording: submission.webcam_recording,
-            screenRecording: submission.screen_recording
+            screenRecording: submission.screen_recording,
+            webcamShareUrl: submission.webcam_share_url,
+            screenShareUrl: submission.screen_share_url
           };
         })
       };
@@ -394,47 +404,51 @@ export const storageService = {
         createdAt: data.created_at,
         testUrl: data.test_url,
         createdBy: data.created_by,
-        submissions: (data.test_submissions || []).map((submission: {
-          id: string;
-          candidate_name: string;
-          candidate_email: string;
-          candidate_phone?: string;
-          years_of_experience: string;
-          task_submissions: string | TaskSubmission[];
-          submitted_at: string;
-          time_spent: number;
-          webcam_recording?: string;
-          screen_recording?: string;
-        }) => {
-          // Parse task_submissions if it's a string
-          let taskSubmissions: TaskSubmission[];
-          if (typeof submission.task_submissions === 'string') {
-            try {
-              taskSubmissions = JSON.parse(submission.task_submissions);
-            } catch (e) {
-              console.error('Error parsing task submissions:', e);
-              taskSubmissions = [];
-            }
-          } else {
-            taskSubmissions = submission.task_submissions as TaskSubmission[];
+      submissions: (data.test_submissions || []).map((submission: {
+        id: string;
+        candidate_name: string;
+        candidate_email: string;
+        candidate_phone?: string;
+        years_of_experience: string;
+        task_submissions: string | TaskSubmission[];
+        submitted_at: string;
+        time_spent: number;
+        webcam_recording?: string;
+        screen_recording?: string;
+        webcam_share_url?: string;
+        screen_share_url?: string;
+      }) => {
+        // Parse task_submissions if it's a string
+        let taskSubmissions: TaskSubmission[];
+        if (typeof submission.task_submissions === 'string') {
+          try {
+            taskSubmissions = JSON.parse(submission.task_submissions);
+          } catch (e) {
+            console.error('Error parsing task submissions:', e);
+            taskSubmissions = [];
           }
-          
-          return {
-            id: submission.id,
-            candidateName: submission.candidate_name,
-            candidateEmail: submission.candidate_email,
-            candidatePhone: submission.candidate_phone,
-            yearsOfExperience: submission.years_of_experience,
-            taskSubmissions,
-            submittedAt: submission.submitted_at,
-            timeSpent: submission.time_spent,
-            webcamRecording: submission.webcam_recording,
-            screenRecording: submission.screen_recording
-          };
-        })
-      };
-    } catch (error) {
-      console.error('Error fetching test by URL:', error);
+        } else {
+          taskSubmissions = submission.task_submissions as TaskSubmission[];
+        }
+        
+        return {
+          id: submission.id,
+          candidateName: submission.candidate_name,
+          candidateEmail: submission.candidate_email,
+          candidatePhone: submission.candidate_phone,
+          yearsOfExperience: submission.years_of_experience,
+          taskSubmissions,
+          submittedAt: submission.submitted_at,
+          timeSpent: submission.time_spent,
+          webcamRecording: submission.webcam_recording,
+          screenRecording: submission.screen_recording,
+          webcamShareUrl: submission.webcam_share_url,
+          screenShareUrl: submission.screen_share_url
+        };
+      })
+    };
+  } catch (error) {
+    console.error('Error fetching test by URL:', error);
       return null;
     }
   },
@@ -605,13 +619,17 @@ export const storageService = {
         submitted_at: submittedAt,
         time_spent: submission.timeSpent || 0,
         webcam_recording: webcamRecording,
-        screen_recording: screenRecording
+        screen_recording: screenRecording,
+        webcam_share_url: submission.webcamShareUrl || null,
+        screen_share_url: submission.screenShareUrl || null
       };
       
       console.log('Submitting data to Supabase:', {
         ...submissionData,
         webcamRecordingSize: webcamRecording ? `${Math.round(webcamRecording.length / 1024)} KB` : 'None',
-        screenRecordingSize: screenRecording ? `${Math.round(screenRecording.length / 1024)} KB` : 'None'
+        screenRecordingSize: screenRecording ? `${Math.round(screenRecording.length / 1024)} KB` : 'None',
+        webcamShareUrl: submission.webcamShareUrl || 'NOT PROVIDED',
+        screenShareUrl: submission.screenShareUrl || 'NOT PROVIDED'
       });
       
       // Start a transaction to add submission and expire the test URL

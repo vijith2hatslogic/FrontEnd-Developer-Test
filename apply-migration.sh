@@ -25,7 +25,7 @@ curl -X POST \
   -H "Content-Type: application/json" \
   -d @- << EOF
 {
-  "sql": "ALTER TABLE test_submissions ADD COLUMN IF NOT EXISTS webcam_recording TEXT; ALTER TABLE test_submissions ADD COLUMN IF NOT EXISTS screen_recording TEXT;"
+  "sql": "ALTER TABLE test_submissions ADD COLUMN IF NOT EXISTS webcam_recording TEXT; ALTER TABLE test_submissions ADD COLUMN IF NOT EXISTS screen_recording TEXT; ALTER TABLE test_submissions ADD COLUMN IF NOT EXISTS webcam_share_url TEXT; ALTER TABLE test_submissions ADD COLUMN IF NOT EXISTS screen_share_url TEXT;"
 }
 EOF
 

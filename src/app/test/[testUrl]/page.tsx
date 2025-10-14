@@ -41,8 +41,24 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
   const [submitting, setSubmitting] = useState(false)
   const [webcamRecordingData, setWebcamRecordingData] = useState<string>('')
   const [screenRecordingData, setScreenRecordingData] = useState<string>('')
+  const [webcamShareUrl, setWebcamShareUrl] = useState<string>('')
+  const [screenShareUrl, setScreenShareUrl] = useState<string>('')
   const [recordingStarted, setRecordingStarted] = useState(false)
+  const [uploadCount, setUploadCount] = useState(0)
+  const isUploadingRecordings = uploadCount > 0
+  const [webcamPercent, setWebcamPercent] = useState<number | null>(null)
+  const [screenPercent, setScreenPercent] = useState<number | null>(null)
+  const [pendingSubmit, setPendingSubmit] = useState(false)
+  const overallPercent = (() => {
+    const parts: number[] = []
+    if (webcamPercent !== null) parts.push(webcamPercent)
+    if (screenPercent !== null) parts.push(screenPercent)
+    if (parts.length === 0) return null
+    return Math.round(parts.reduce((a, b) => a + b, 0) / parts.length)
+  })()
+  const [candidateName, setCandidateName] = useState<string>('')
   const router = useRouter()
+  // @ts-ignore - Next.js params type
   const testUrl = use(params).testUrl
   
   const { register, handleSubmit, formState: { errors } } = useForm<CandidateFormData>({
@@ -131,6 +147,7 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
   const handleCandidateSubmit = (data: CandidateFormData) => {
     // Store candidate info and start the test
     localStorage.setItem('candidateInfo', JSON.stringify(data))
+    setCandidateName(data.name)
     setStep(1)
   }
   
@@ -175,12 +192,46 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
       // Get recording data from our recording service
       let webcamRecording = webcamRecordingData
       let screenRecording = screenRecordingData
+      let finalWebcamShareUrl = webcamShareUrl
+      let finalScreenShareUrl = screenShareUrl
+
+      // If Wistia embed URLs are present but share URLs are missing, derive share URLs
+      if (!finalWebcamShareUrl && webcamRecording && webcamRecording.includes('fast.wistia.net/embed/iframe/')) {
+        const match = webcamRecording.match(/embed\/iframe\/([a-zA-Z0-9]+)/)
+        if (match && match[1]) {
+          finalWebcamShareUrl = `https://home.wistia.com/medias/${match[1]}`
+        }
+      }
+      if (!finalScreenShareUrl && screenRecording && screenRecording.includes('fast.wistia.net/embed/iframe/')) {
+        const match = screenRecording.match(/embed\/iframe\/([a-zA-Z0-9]+)/)
+        if (match && match[1]) {
+          finalScreenShareUrl = `https://home.wistia.com/medias/${match[1]}`
+        }
+      }
       
+      // Queue submit until uploads complete and URLs (or fallbacks) are ready
+      const webcamReady = Boolean(finalWebcamShareUrl || webcamRecording)
+      const screenReady = Boolean(finalScreenShareUrl || screenRecording)
+      const recordingsReady = !isUploadingRecordings && (!recordingStarted || (webcamReady && screenReady))
+      if (!recordingsReady) {
+        console.log('Queueing submission until recordings are ready', {
+          recordingStarted,
+          isUploadingRecordings,
+          webcamReady,
+          screenReady
+        })
+        setPendingSubmit(true)
+        setSubmitting(false)
+        return
+      }
+
       console.log('Preparing submission with recordings:', {
         webcamRecordingAvailable: Boolean(webcamRecording),
         screenRecordingAvailable: Boolean(screenRecording),
         webcamRecordingSize: webcamRecording ? webcamRecording.length : 0,
-        screenRecordingSize: screenRecording ? screenRecording.length : 0
+        screenRecordingSize: screenRecording ? screenRecording.length : 0,
+        webcamShareUrl: finalWebcamShareUrl || 'NOT SET',
+        screenShareUrl: finalScreenShareUrl || 'NOT SET'
       })
       
       // Prepare submission data including recordings
@@ -192,7 +243,9 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
         taskSubmissions,
         timeSpent: test.totalTime * 60 - timeRemaining, // in seconds
         webcamRecording,
-        screenRecording
+        screenRecording,
+        webcamShareUrl: finalWebcamShareUrl,
+        screenShareUrl: finalScreenShareUrl
       }
       
       // Add submission to test
@@ -221,6 +274,7 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
       
       // Move to completion step
       setStep(2)
+      setPendingSubmit(false)
     } catch (err) {
       console.error('Error submitting test:', err)
       if (err instanceof Error) {
@@ -232,6 +286,28 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
       setSubmitting(false)
     }
   }
+
+  // Auto-submit when uploads finish and URLs are ready
+  useEffect(() => {
+    if (!pendingSubmit || submitting) return
+    // Derive share URLs from embed if needed
+    let tempWebcamShare = webcamShareUrl
+    let tempScreenShare = screenShareUrl
+    if (!tempWebcamShare && webcamRecordingData && webcamRecordingData.includes('fast.wistia.net/embed/iframe/')) {
+      const m = webcamRecordingData.match(/embed\/iframe\/([a-zA-Z0-9]+)/)
+      if (m && m[1]) tempWebcamShare = `https://home.wistia.com/medias/${m[1]}`
+    }
+    if (!tempScreenShare && screenRecordingData && screenRecordingData.includes('fast.wistia.net/embed/iframe/')) {
+      const m = screenRecordingData.match(/embed\/iframe\/([a-zA-Z0-9]+)/)
+      if (m && m[1]) tempScreenShare = `https://home.wistia.com/medias/${m[1]}`
+    }
+    const webcamReady = Boolean(tempWebcamShare || webcamRecordingData)
+    const screenReady = Boolean(tempScreenShare || screenRecordingData)
+    const recordingsReady = !isUploadingRecordings && (!recordingStarted || (webcamReady && screenReady))
+    if (recordingsReady) {
+      void handleSubmitTest()
+    }
+  }, [pendingSubmit, submitting, isUploadingRecordings, recordingStarted, webcamShareUrl, screenShareUrl, webcamRecordingData, screenRecordingData])
   
   if (loading) {
     return (
@@ -247,6 +323,14 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
         <div className="card max-w-2xl mx-auto">
           <h1 className="text-2xl font-bold text-danger mb-4">Error</h1>
           <p>{error}</p>
+          {recordingStarted && isUploadingRecordings && (
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+              <p className="text-sm text-blue-800">Uploading recordings... This will auto-submit when complete.</p>
+              <div className="mt-2 w-full bg-gray-200 rounded h-2">
+                <div className="bg-primary h-2 rounded" style={{ width: `${overallPercent ?? 0}%` }} />
+              </div>
+            </div>
+          )}
           <Link href="/" className="btn btn-primary mt-4 inline-block">
             Back to Home
           </Link>
@@ -392,11 +476,39 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
         
         <div className="card mb-6">
           <BasicRecordingManager 
-            onWebcamRecordingComplete={(data) => {
-              setWebcamRecordingData(data)
-              setRecordingStarted(true)
+            candidateName={candidateName}
+            onRecordingStart={() => {
+              console.log('[Test Page] Recording started - showing questions');
+              setRecordingStarted(true);
             }}
-            onScreenRecordingComplete={setScreenRecordingData}
+            onUploadingChange={(uploading) => {
+              setUploadCount(prev => {
+                const next = uploading ? prev + 1 : prev - 1
+                return next < 0 ? 0 : next
+              })
+            }}
+            onProgressChange={({ kind, percent }) => {
+              if (kind === 'webcam') setWebcamPercent(percent)
+              if (kind === 'screen') setScreenPercent(percent)
+            }}
+            onWebcamRecordingComplete={(data, shareUrl) => {
+              console.log('[Test Page] Webcam recording complete', { 
+                dataType: data.startsWith('data:') ? 'Base64' : data.includes('wistia') ? 'Wistia' : 'Other',
+                hasShareUrl: !!shareUrl,
+                shareUrl: shareUrl || 'none'
+              });
+              setWebcamRecordingData(data)
+              if (shareUrl) setWebcamShareUrl(shareUrl)
+            }}
+            onScreenRecordingComplete={(data, shareUrl) => {
+              console.log('[Test Page] Screen recording complete', { 
+                dataType: data.startsWith('data:') ? 'Base64' : data.includes('wistia') ? 'Wistia' : 'Other',
+                hasShareUrl: !!shareUrl,
+                shareUrl: shareUrl || 'none'
+              });
+              setScreenRecordingData(data)
+              if (shareUrl) setScreenShareUrl(shareUrl)
+            }}
           />
         </div>
         
@@ -432,9 +544,10 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
                 <button
                   onClick={handleSubmitTest}
                   className="btn btn-primary w-full mt-6"
-                  disabled={submitting}
+                  disabled={submitting || (recordingStarted && isUploadingRecordings)}
+                  title={recordingStarted && isUploadingRecordings ? 'Please wait for recordings to finish uploading' : ''}
                 >
-                  {submitting ? 'Submitting...' : 'Submit Test'}
+                  {submitting ? 'Submitting...' : (recordingStarted && isUploadingRecordings ? `Uploading recordings...${overallPercent !== null ? ` ${overallPercent}%` : ''}` : 'Submit Test')}
                 </button>
               </div>
             </div>
