@@ -7,6 +7,7 @@
 
 const WISTIA_API_TOKEN = process.env.NEXT_PUBLIC_WISTIA_API_TOKEN || '';
 const WISTIA_UPLOAD_URL = 'https://upload.wistia.com';
+const WISTIA_PROJECT_HASH = process.env.NEXT_PUBLIC_WISTIA_PROJECT_ID || '';
 
 export interface WistiaUploadResponse {
   id: number;
@@ -66,6 +67,10 @@ export async function uploadToWistia(
     if (description) {
       formData.append('name', description);
     }
+    // Target a specific Wistia project if provided (hashed ID)
+    if (WISTIA_PROJECT_HASH) {
+      formData.append('project', WISTIA_PROJECT_HASH);
+    }
 
     // Use XMLHttpRequest to track progress
     const data: WistiaUploadResponse = await new Promise((resolve, reject) => {
@@ -93,7 +98,8 @@ export async function uploadToWistia(
             console.error('[Wistia] Upload failed:', {
               status: xhr.status,
               statusText: xhr.statusText,
-              error: errorText
+              error: errorText,
+              project: WISTIA_PROJECT_HASH ? 'set' : 'not_set'
             });
             reject(new Error(`Wistia upload failed: ${xhr.statusText} (${xhr.status}). Error: ${errorText}`));
             return;
@@ -103,6 +109,9 @@ export async function uploadToWistia(
             if (onProgress) onProgress(100);
             resolve(json);
           } catch (e) {
+            console.error('[Wistia] Failed to parse upload JSON:', {
+              responseText: xhr.responseText?.substring(0, 500) || '(empty)'
+            });
             reject(e);
           }
         }

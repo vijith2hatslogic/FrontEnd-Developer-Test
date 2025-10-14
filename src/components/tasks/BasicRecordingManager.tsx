@@ -1,7 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { uploadToWistia, WistiaVideoInfo } from '@/lib/wistiaService';
+
+export interface RecordingControls {
+  stopAll: () => Promise<void>;
+}
 
 interface BasicRecordingManagerProps {
   onWebcamRecordingComplete: (recordingData: string, shareUrl?: string) => void;
@@ -9,17 +13,19 @@ interface BasicRecordingManagerProps {
   onRecordingStart?: () => void; // NEW: Called when recording actually starts
   onUploadingChange?: (isUploading: boolean) => void; // NEW: notify parent of upload state
   onProgressChange?: (payload: { kind: 'webcam' | 'screen'; percent: number }) => void; // NEW: per-stream progress
+  onViolation?: (message: string) => void; // NEW: manual stop detection
   candidateName?: string;
 }
 
-const BasicRecordingManager: React.FC<BasicRecordingManagerProps> = ({
+const BasicRecordingManager = forwardRef<RecordingControls, BasicRecordingManagerProps>(({ 
   onWebcamRecordingComplete,
   onScreenRecordingComplete,
   onRecordingStart,
   onUploadingChange,
   onProgressChange,
   candidateName = 'Candidate',
-}) => {
+  onViolation
+}, ref) => {
   const [webcamPermissionGranted, setWebcamPermissionGranted] = useState(false);
   const [screenPermissionGranted, setScreenPermissionGranted] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -39,6 +45,10 @@ const BasicRecordingManager: React.FC<BasicRecordingManagerProps> = ({
   
   const webcamChunksRef = useRef<Blob[]>([]);
   const screenChunksRef = useRef<Blob[]>([]);
+  const programmaticStopRef = useRef(false);
+  const webcamDoneRef = useRef(true);
+  const screenDoneRef = useRef(true);
+  const stopAllResolveRef = useRef<(() => void) | null>(null);
   
   // Check if MediaRecorder is supported
   const isMediaRecorderSupported = typeof window !== 'undefined' && 'MediaRecorder' in window;
@@ -65,6 +75,16 @@ const BasicRecordingManager: React.FC<BasicRecordingManagerProps> = ({
       }
       
       setWebcamPermissionGranted(true);
+
+      // Detect manual webcam stop
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.addEventListener('ended', () => {
+          if (isRecording && !programmaticStopRef.current && onViolation) {
+            onViolation('Webcam recording was stopped during the test.');
+          }
+        });
+      }
     } catch (err) {
       console.error('Error accessing webcam:', err);
       setError('Could not access webcam. Please check your permissions.');
@@ -95,10 +115,16 @@ const BasicRecordingManager: React.FC<BasicRecordingManagerProps> = ({
       setScreenPermissionGranted(true);
       
       // Handle when user stops screen sharing
-      stream.getVideoTracks()[0].addEventListener('ended', () => {
-        setScreenPermissionGranted(false);
-        screenStreamRef.current = null;
-      });
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.addEventListener('ended', () => {
+          setScreenPermissionGranted(false);
+          screenStreamRef.current = null;
+          if (isRecording && !programmaticStopRef.current && onViolation) {
+            onViolation('Screen sharing was stopped during the test.');
+          }
+        });
+      }
     } catch (err) {
       console.error('Error accessing screen:', err);
       setError('Could not access screen sharing. Please check your permissions.');
@@ -160,6 +186,8 @@ const BasicRecordingManager: React.FC<BasicRecordingManagerProps> = ({
       // Reset chunks for video recording
       webcamChunksRef.current = [];
       screenChunksRef.current = [];
+      webcamDoneRef.current = false;
+      screenDoneRef.current = false;
       
       if (isMediaRecorderSupported) {
         try {
@@ -250,6 +278,12 @@ const BasicRecordingManager: React.FC<BasicRecordingManagerProps> = ({
                 onWebcamRecordingComplete(screenshot);
               }
             }
+            webcamDoneRef.current = true;
+            if (webcamDoneRef.current && screenDoneRef.current && stopAllResolveRef.current) {
+              stopAllResolveRef.current();
+              stopAllResolveRef.current = null;
+              programmaticStopRef.current = false;
+            }
           };
           
           // Create screen recorder
@@ -318,6 +352,12 @@ const BasicRecordingManager: React.FC<BasicRecordingManagerProps> = ({
                 const screenshot = await captureScreenshot(screenStreamRef.current);
                 onScreenRecordingComplete(screenshot);
               }
+            }
+            screenDoneRef.current = true;
+            if (webcamDoneRef.current && screenDoneRef.current && stopAllResolveRef.current) {
+              stopAllResolveRef.current();
+              stopAllResolveRef.current = null;
+              programmaticStopRef.current = false;
             }
           };
           
@@ -394,6 +434,27 @@ const BasicRecordingManager: React.FC<BasicRecordingManagerProps> = ({
       await captureAndSaveScreenshots();
     }
   };
+
+  // Expose imperative stopAll to parent
+  useImperativeHandle(ref, () => ({
+    stopAll: () => {
+      programmaticStopRef.current = true;
+      return new Promise<void>((resolve) => {
+        stopAllResolveRef.current = resolve;
+        // If not recording, resolve immediately
+        if (!isRecording) {
+          webcamDoneRef.current = true;
+          screenDoneRef.current = true;
+          resolve();
+          stopAllResolveRef.current = null;
+          programmaticStopRef.current = false;
+          return;
+        }
+        // Trigger stop; onstop handlers will resolve when both complete
+        void stopRecording();
+      });
+    }
+  }));
   
   // Clean up on unmount
   useEffect(() => {
@@ -534,6 +595,6 @@ const BasicRecordingManager: React.FC<BasicRecordingManagerProps> = ({
       </div>
     </div>
   );
-};
+});
 
 export default BasicRecordingManager;

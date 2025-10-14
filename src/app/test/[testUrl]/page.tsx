@@ -13,12 +13,14 @@ import UIImplementationTask from '@/components/tasks/UIImplementationTask'
 import ThoughtProcessTask from '@/components/tasks/ThoughtProcessTask'
 import CodeExecutionEnvironment from '@/components/tasks/CodeExecutionEnvironment'
 import dynamic from 'next/dynamic'
+import { useRef } from 'react'
 
-// Import the recording manager with no SSR
+// Import the recording manager with no SSR (separate webcam + screen, single button)
 const BasicRecordingManager = dynamic(
   () => import('@/components/tasks/BasicRecordingManager'),
   { ssr: false }
 )
+import type { RecordingControls } from '@/components/tasks/BasicRecordingManager'
 import { storageService, Test, TaskSubmission } from '@/lib/storage'
 
 const candidateSchema = z.object({
@@ -49,6 +51,7 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
   const [webcamPercent, setWebcamPercent] = useState<number | null>(null)
   const [screenPercent, setScreenPercent] = useState<number | null>(null)
   const [pendingSubmit, setPendingSubmit] = useState(false)
+  const [violationWarning, setViolationWarning] = useState<string | null>(null)
   const overallPercent = (() => {
     const parts: number[] = []
     if (webcamPercent !== null) parts.push(webcamPercent)
@@ -57,6 +60,7 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
     return Math.round(parts.reduce((a, b) => a + b, 0) / parts.length)
   })()
   const [candidateName, setCandidateName] = useState<string>('')
+  const recorderRef = useRef<RecordingControls | null>(null)
   const router = useRouter()
   // @ts-ignore - Next.js params type
   const testUrl = use(params).testUrl
@@ -165,11 +169,17 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
     )
   }
   
-  const handleSubmitTest = async () => {
+  const handleSubmitTest = async (force: boolean = false) => {
     if (!test) return
     
     try {
       setSubmitting(true)
+      // Ensure recording is stopped and uploads triggered, unless we're forcing (already done)
+      if (!force && recorderRef.current) {
+        try {
+          await recorderRef.current.stopAll()
+        } catch {}
+      }
       
       // Get candidate info from localStorage
       const candidateInfoStr = localStorage.getItem('candidateInfo')
@@ -209,11 +219,11 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
         }
       }
       
-      // Queue submit until uploads complete and URLs (or fallbacks) are ready
+      // Queue submit until uploads complete and URLs (or fallbacks) are ready, unless forced
       const webcamReady = Boolean(finalWebcamShareUrl || webcamRecording)
       const screenReady = Boolean(finalScreenShareUrl || screenRecording)
       const recordingsReady = !isUploadingRecordings && (!recordingStarted || (webcamReady && screenReady))
-      if (!recordingsReady) {
+      if (!force && !recordingsReady) {
         console.log('Queueing submission until recordings are ready', {
           recordingStarted,
           isUploadingRecordings,
@@ -305,7 +315,8 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
     const screenReady = Boolean(tempScreenShare || screenRecordingData)
     const recordingsReady = !isUploadingRecordings && (!recordingStarted || (webcamReady && screenReady))
     if (recordingsReady) {
-      void handleSubmitTest()
+      // Force submit without re-triggering stop
+      void handleSubmitTest(true)
     }
   }, [pendingSubmit, submitting, isUploadingRecordings, recordingStarted, webcamShareUrl, screenShareUrl, webcamRecordingData, screenRecordingData])
   
@@ -473,9 +484,15 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
             </div>
           </div>
         </div>
+        {violationWarning && (
+          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-yellow-800 text-sm">
+            {violationWarning}
+          </div>
+        )}
         
         <div className="card mb-6">
           <BasicRecordingManager 
+            ref={recorderRef as any}
             candidateName={candidateName}
             onRecordingStart={() => {
               console.log('[Test Page] Recording started - showing questions');
@@ -508,6 +525,10 @@ export default function TestPage({ params }: { params: { testUrl: string } }) {
               });
               setScreenRecordingData(data)
               if (shareUrl) setScreenShareUrl(shareUrl)
+            }}
+            onViolation={(msg) => {
+              setViolationWarning(`${msg} We will submit your recordings now.`)
+              setPendingSubmit(true)
             }}
           />
         </div>
