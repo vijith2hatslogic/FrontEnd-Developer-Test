@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -47,6 +48,16 @@ export default function Register() {
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="card max-w-md mx-auto">
+        <div className="flex justify-center mb-8">
+          <Image
+            src="/logo-wide.svg"
+            alt="2hatslogic"
+            width={200}
+            height={50}
+            priority
+            className="h-12 w-auto"
+          />
+        </div>
         <h1 className="text-2xl font-bold text-center mb-6">Register</h1>
         
         {error && (

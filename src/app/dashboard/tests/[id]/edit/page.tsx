@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/components/auth/AuthProvider'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
+import Header from '@/components/Header'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -188,6 +189,7 @@ export default function EditTest({ params }: PageProps) {
   
   return (
     <ProtectedRoute>
+      <Header showLogout={true} />
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center mb-8">
           <Link href={`/dashboard/tests/${testId}`} className="text-primary hover:underline mr-4">

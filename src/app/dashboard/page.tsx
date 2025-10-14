@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/components/auth/AuthProvider'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
+import Header from '@/components/Header'
 import { storageService, Test, TestSubmission } from '@/lib/storage'
 
 export default function Dashboard() {
@@ -66,6 +67,7 @@ export default function Dashboard() {
 
   return (
     <ProtectedRoute>
+      <Header showLogout={true} />
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Dashboard</h1>
@@ -73,9 +75,6 @@ export default function Dashboard() {
             <Link href="/dashboard/create-test" className="btn btn-primary">
               Create New Test
             </Link>
-            <button onClick={handleLogout} className="btn btn-secondary">
-              Logout
-            </button>
           </div>
         </div>
 

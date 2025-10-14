@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/auth/AuthProvider'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
+import Header from '@/components/Header'
 import { storageService, Test, TestSubmission } from '@/lib/storage'
 
 interface PageProps {
@@ -119,6 +120,7 @@ export default function TestView({ params }: PageProps) {
   
   return (
     <ProtectedRoute>
+      <Header showLogout={true} />
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center mb-8">
           <Link href="/dashboard" className="text-primary hover:underline mr-4">
