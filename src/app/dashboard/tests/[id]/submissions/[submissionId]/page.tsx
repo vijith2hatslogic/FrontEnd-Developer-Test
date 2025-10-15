@@ -276,7 +276,6 @@ export default function SubmissionView({ params }: PageProps) {
                           <iframe
                             src={submission.webcamRecording}
                             title="Webcam Recording"
-                            allowTransparency
                             frameBorder="0"
                             scrolling="no"
                             className="w-full h-80"
@@ -312,7 +311,6 @@ export default function SubmissionView({ params }: PageProps) {
                           <iframe
                             src={submission.screenRecording}
                             title="Screen Recording"
-                            allowTransparency
                             frameBorder="0"
                             scrolling="no"
                             className="w-full h-80"
