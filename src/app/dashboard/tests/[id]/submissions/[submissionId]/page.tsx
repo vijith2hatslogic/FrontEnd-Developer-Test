@@ -7,6 +7,7 @@ import { useAuth } from '@/components/auth/AuthProvider'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import Header from '@/components/Header'
 import { storageService, Test, TestSubmission } from '@/lib/storage'
+import { supabase } from '@/lib/supabase'
 
 interface PageProps {
   params: { id: string; submissionId: string }
@@ -45,7 +46,7 @@ export default function SubmissionView({ params }: PageProps) {
         setTest(testData)
         
         // Find the specific submission
-        const submissionData = testData.submissions.find(s => s.id === submissionId)
+        let submissionData = testData.submissions.find(s => s.id === submissionId)
         
         if (!submissionData) {
           setError('Submission not found')
@@ -53,6 +54,33 @@ export default function SubmissionView({ params }: PageProps) {
           return
         }
         
+        // Fallback: refresh this submission directly from DB to ensure latest URLs
+        try {
+          const { data: fresh, error: freshError } = await supabase
+            .from('test_submissions')
+            .select('*')
+            .eq('id', submissionId)
+            .single()
+          if (!freshError && fresh) {
+            submissionData = {
+              id: fresh.id,
+              candidateName: fresh.candidate_name,
+              candidateEmail: fresh.candidate_email,
+              candidatePhone: fresh.candidate_phone,
+              yearsOfExperience: fresh.years_of_experience,
+              taskSubmissions: typeof fresh.task_submissions === 'string' ? JSON.parse(fresh.task_submissions) : fresh.task_submissions,
+              submittedAt: fresh.submitted_at,
+              timeSpent: fresh.time_spent,
+              webcamRecording: fresh.webcam_recording,
+              screenRecording: fresh.screen_recording,
+              webcamShareUrl: fresh.webcam_share_url,
+              screenShareUrl: fresh.screen_share_url,
+            } as TestSubmission
+          }
+        } catch (e) {
+          // non-fatal, keep existing submissionData
+        }
+
         console.log('Submission data loaded:', {
           submissionId: submissionData.id,
           taskSubmissionsType: typeof submissionData.taskSubmissions,

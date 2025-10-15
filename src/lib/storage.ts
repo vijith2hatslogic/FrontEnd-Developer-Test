@@ -639,8 +639,13 @@ export const storageService = {
         .select();
       
       if (submissionError) {
-        console.error('Supabase submission error:', submissionError);
-        throw new Error(`Failed to add submission: ${submissionError.message}`);
+        console.error('Supabase submission error:', {
+          message: submissionError.message,
+          code: (submissionError as any).code,
+          details: (submissionError as any).details,
+          hint: (submissionError as any).hint
+        });
+        throw new Error(`Failed to add submission: ${submissionError.message} [code=${(submissionError as any).code || 'n/a'}]`);
       }
       
       // Expire the test URL
